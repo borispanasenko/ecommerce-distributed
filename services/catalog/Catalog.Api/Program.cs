@@ -1,4 +1,5 @@
 using Catalog.Infrastructure;
+using Catalog.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,8 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    await app.Services.SeedCatalogDatabaseAsync();
 }
 
 // app.UseHttpsRedirection();
