@@ -1,0 +1,23 @@
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand">MarketFlow</div>
+
+    <nav class="nav">
+      <a routerLink="/listings" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        Listings
+      </a>
+
+      <a routerLink="/orders/ord-9001" routerLinkActive="active">
+        Order
+      </a>
+
+      <a routerLink="/seller" routerLinkActive="active">
+        Seller
+      </a>
+    </nav>
+  </header>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>

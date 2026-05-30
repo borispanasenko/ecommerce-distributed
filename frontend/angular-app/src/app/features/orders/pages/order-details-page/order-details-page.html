@@ -1,0 +1,51 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Transaction</p>
+      <h1>Order {{ order.id }}</h1>
+      <p class="subtitle">Track the lifecycle of the order through the workflow.</p>
+    </div>
+
+    <span class="status">{{ order.status }}</span>
+  </header>
+
+  <div class="layout">
+    <article class="panel">
+      <h2>Order summary</h2>
+      <dl class="summary">
+        <div>
+          <dt>Listing</dt>
+          <dd>{{ order.listingTitle }}</dd>
+        </div>
+        <div>
+          <dt>Buyer</dt>
+          <dd>{{ order.buyerName }}</dd>
+        </div>
+        <div>
+          <dt>Seller</dt>
+          <dd>{{ order.sellerName }}</dd>
+        </div>
+        <div>
+          <dt>Amount</dt>
+          <dd>{{ order.amount }} {{ order.currency }}</dd>
+        </div>
+      </dl>
+    </article>
+
+    <article class="panel">
+      <h2>Timeline</h2>
+
+      <div class="timeline">
+        @for (event of timeline; track event.label) {
+          <div class="timeline-item">
+            <div class="dot" [class.done]="event.status === 'done'" [class.current]="event.status === 'current'"></div>
+            <div class="content">
+              <p class="event-label">{{ event.label }}</p>
+              <p class="event-time">{{ event.timestamp }}</p>
+            </div>
+          </div>
+        }
+      </div>
+    </article>
+  </div>
+</section>

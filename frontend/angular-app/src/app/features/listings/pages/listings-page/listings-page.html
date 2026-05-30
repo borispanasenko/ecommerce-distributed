@@ -1,0 +1,31 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Marketplace</p>
+      <h1>Listings</h1>
+      <p class="subtitle">Browse available products and start a transaction.</p>
+    </div>
+  </header>
+
+  <div class="cards">
+    @for (listing of listings; track listing.id) {
+      <article class="card">
+        <div class="card-top">
+          <span class="badge">{{ listing.condition }}</span>
+          <span class="muted">{{ listing.location }}</span>
+        </div>
+
+        <h2>{{ listing.title }}</h2>
+
+        <p class="price">{{ listing.price }} {{ listing.currency }}</p>
+
+        <p class="muted">Seller: {{ listing.sellerName }}</p>
+
+        <div class="actions">
+          <button type="button">View details</button>
+          <button type="button" class="primary">Buy now</button>
+        </div>
+      </article>
+    }
+  </div>
+</section>

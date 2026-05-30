@@ -1,0 +1,50 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Seller area</p>
+      <h1>{{ sellerName }} dashboard</h1>
+      <p class="subtitle">Manage listings and watch transaction activity.</p>
+    </div>
+
+    <button type="button" class="primary">Create listing</button>
+  </header>
+
+  <div class="stats">
+    <article class="stat-card">
+      <p class="label">Active listings</p>
+      <p class="value">{{ stats.activeListings }}</p>
+    </article>
+
+    <article class="stat-card">
+      <p class="label">Reserved</p>
+      <p class="value">{{ stats.reservedListings }}</p>
+    </article>
+
+    <article class="stat-card">
+      <p class="label">Completed orders</p>
+      <p class="value">{{ stats.completedOrders }}</p>
+    </article>
+  </div>
+
+  <article class="panel">
+    <h2>Your listings</h2>
+
+    <div class="table">
+      <div class="row head">
+        <div>Title</div>
+        <div>Price</div>
+        <div>Views</div>
+        <div>Status</div>
+      </div>
+
+      @for (listing of listings; track listing.id) {
+        <div class="row">
+          <div>{{ listing.title }}</div>
+          <div>{{ listing.price }} {{ listing.currency }}</div>
+          <div>{{ listing.views }}</div>
+          <div>{{ listing.status }}</div>
+        </div>
+      }
+    </div>
+  </article>
+</section>
