@@ -2,6 +2,8 @@ using Catalog.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Catalog.Application.Products.Queries;
+using Catalog.Infrastructure.Products;
 
 namespace Catalog.Infrastructure;
 
@@ -23,6 +25,8 @@ public static class DependencyInjection
         {
             options.UseNpgsql(connectionString);
         });
+
+        services.AddScoped<IProductQueries, EfProductQueries>();
 
         return services;
     }
