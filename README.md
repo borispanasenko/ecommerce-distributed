@@ -4,13 +4,25 @@ Small distributed commerce system.
 
 ## Services
 
-* `catalog` — products, brands, categories, variants/SKUs
-* `inventory` — stock and warehouse operations
-* `ordering` — orders
-* `payment` — payment simulation
-* `frontend/angular-app` — Angular UI
+```text
+catalog   - products, brands, categories, variants/SKUs
+inventory - warehouses, locations, stock, reservations
+ordering  - orders
+payment   - payment simulation
+frontend  - Angular UI
+```
 
-## Current Catalog flow
+## Current status
+
+```text
+Catalog   - working backend flow, API, tests, documentation
+Inventory - working backend flow, API, tests, documentation
+Ordering  - scaffold
+Payment   - scaffold
+Frontend  - scaffold
+```
+
+## Catalog flow
 
 ```text
 Create brand
@@ -42,13 +54,60 @@ POST /api/products/{id}/publish
 POST /api/products/{id}/archive
 ```
 
-## Local run
+## Inventory flow
+
+```text
+Create warehouse
+Create storage location
+Receive stock for SKU
+Get stock by SKU
+Reserve stock
+Release reservation
+Commit reservation
+Get stock movements
+```
+
+## Inventory API
+
+```text
+GET  /health
+
+GET  /api/warehouses
+POST /api/warehouses
+
+GET  /api/locations
+POST /api/locations
+
+POST /api/stock/receipts
+GET  /api/stock/{sku}
+GET  /api/stock/movements
+
+POST /api/stock/reservations
+POST /api/stock/reservations/{id}/release
+POST /api/stock/reservations/{id}/commit
+```
+
+## Local infrastructure
+
+Start databases and services:
 
 ```bash
 docker compose up -d
 ```
 
-Run Catalog API locally against Docker database:
+Catalog database from host:
+
+```text
+Host=localhost;Port=5433;Database=catalog_db;Username=postgres;Password=postgres
+```
+
+Inventory database from host:
+
+```text
+Host=localhost;Port=5435;Database=inventory_db;Username=postgres;Password=postgres
+```
+
+## Run Catalog API locally
 
 ```bash
 ASPNETCORE_ENVIRONMENT=Development \
@@ -56,8 +115,81 @@ ConnectionStrings__DefaultConnection="Host=localhost;Port=5433;Database=catalog_
 dotnet run --project services/catalog/Catalog.Api/Catalog.Api.csproj
 ```
 
+## Run Inventory API locally
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development \
+ConnectionStrings__DefaultConnection="Host=localhost;Port=5435;Database=inventory_db;Username=postgres;Password=postgres" \
+dotnet run --project services/inventory/Inventory.Api/Inventory.Api.csproj
+```
+
 ## Tests
+
+Catalog:
 
 ```bash
 dotnet test services/catalog/Catalog.sln
 ```
+
+Inventory:
+
+```bash
+dotnet test services/inventory/Inventory.sln
+```
+
+## Manual API checks
+
+Catalog:
+
+```text
+services/catalog/Catalog.Api/Catalog.Api.http
+services/catalog/Catalog.Api/Catalog.Api.readonly.http
+```
+
+Inventory:
+
+```text
+services/inventory/Inventory.Api/Inventory.Api.http
+services/inventory/Inventory.Api/Inventory.Api.readonly.http
+```
+
+Files ending with `.readonly.http` contain only safe read-only requests.
+
+## Documentation
+
+```text
+docs/catalog-db.md
+docs/inventory-db.md
+docs/architecture.md
+docs/local-development.md
+docs/messages.md
+```
+
+## Boundaries
+
+Catalog owns:
+
+```text
+products
+brands
+categories
+variants/SKUs
+product images
+current product prices
+```
+
+Inventory owns:
+
+```text
+warehouses
+storage locations
+stock balances
+stock movements
+stock reservations
+```
+
+Catalog does not store stock.
+
+Inventory does not store product descriptions or prices.
+
+Inventory stores stock by SKU.
