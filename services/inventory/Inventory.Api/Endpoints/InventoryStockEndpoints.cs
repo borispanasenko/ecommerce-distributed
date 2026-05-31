@@ -117,6 +117,69 @@ public static class InventoryStockEndpoints
         .WithName("GetStockMovements")
         .WithOpenApi();
 
+        stock.MapPost("/reservations", async (
+            CreateStockReservationRequest request,
+            IInventoryStockService inventoryStockService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await inventoryStockService.ReserveStockAsync(request, cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new
+                {
+                    error = result.ErrorCode,
+                    message = result.ErrorMessage
+                });
+            }
+
+            return Results.Created($"/api/stock/reservations/{result.Value!.Id}", result.Value);
+        })
+        .WithName("ReserveStock")
+        .WithOpenApi();
+
+        stock.MapPost("/reservations/{reservationId:guid}/release", async (
+            Guid reservationId,
+            IInventoryStockService inventoryStockService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await inventoryStockService.ReleaseReservationAsync(reservationId, cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new
+                {
+                    error = result.ErrorCode,
+                    message = result.ErrorMessage
+                });
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .WithName("ReleaseStockReservation")
+        .WithOpenApi();
+
+        stock.MapPost("/reservations/{reservationId:guid}/commit", async (
+            Guid reservationId,
+            IInventoryStockService inventoryStockService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await inventoryStockService.CommitReservationAsync(reservationId, cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new
+                {
+                    error = result.ErrorCode,
+                    message = result.ErrorMessage
+                });
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .WithName("CommitStockReservation")
+        .WithOpenApi();
+
         stock.MapGet("/{sku}", async (
             string sku,
             IInventoryStockService inventoryStockService,

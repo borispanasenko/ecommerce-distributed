@@ -21,6 +21,18 @@ public interface IInventoryStockService
         ReceiveStockRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<InventoryResult<StockReservationDto>> ReserveStockAsync(
+        CreateStockReservationRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<InventoryResult<StockReservationDto>> ReleaseReservationAsync(
+        Guid reservationId,
+        CancellationToken cancellationToken = default);
+
+    Task<InventoryResult<StockReservationDto>> CommitReservationAsync(
+        Guid reservationId,
+        CancellationToken cancellationToken = default);
+
     Task<StockSummaryDto?> GetStockBySkuAsync(
         string sku,
         CancellationToken cancellationToken = default);
@@ -94,6 +106,25 @@ public sealed record StockMovementDto(
     long Quantity,
     string? Reason,
     DateTimeOffset CreatedAt);
+
+public sealed record CreateStockReservationRequest(
+    string Sku,
+    Guid WarehouseId,
+    Guid LocationId,
+    long Quantity,
+    string? Reference);
+
+public sealed record StockReservationDto(
+    Guid Id,
+    string Sku,
+    Guid WarehouseId,
+    Guid LocationId,
+    long Quantity,
+    string Status,
+    string? Reference,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ReleasedAt,
+    DateTimeOffset? CommittedAt);
 
 public sealed record InventoryResult<T>(
     bool IsSuccess,
