@@ -79,3 +79,10 @@ button.primary {
   color: white;
   border-color: #111;
 }
+
+.variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}

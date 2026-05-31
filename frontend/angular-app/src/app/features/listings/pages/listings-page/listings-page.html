@@ -1,31 +1,47 @@
 <section class="page">
   <header class="page-header">
     <div>
-      <p class="eyebrow">Marketplace</p>
-      <h1>Listings</h1>
-      <p class="subtitle">Browse available products and start a transaction.</p>
+      <p class="eyebrow">Catalog</p>
+      <h1>Products</h1>
+      <p class="subtitle">Products loaded from the Catalog service.</p>
     </div>
   </header>
 
-  <div class="cards">
-    @for (listing of listings; track listing.id) {
-      <article class="card">
-        <div class="card-top">
-          <span class="badge">{{ listing.condition }}</span>
-          <span class="muted">{{ listing.location }}</span>
-        </div>
+  @if (products$ | async; as products) {
+    <div class="cards">
+      @for (product of products; track product.id) {
+        <article class="card">
+          <div class="card-top">
+            <span class="badge">{{ product.brandName ?? 'No brand' }}</span>
+            <span class="muted">{{ product.status }}</span>
+          </div>
 
-        <h2>{{ listing.title }}</h2>
+          <h2>{{ product.name }}</h2>
 
-        <p class="price">{{ listing.price }} {{ listing.currency }}</p>
+          <p class="muted">{{ product.categories.join(' · ') }}</p>
 
-        <p class="muted">Seller: {{ listing.sellerName }}</p>
+          @if (getLowestPrice(product); as lowestPrice) {
+            <p class="price">
+              From {{ formatPrice(lowestPrice, product.variants[0].currency) }}
+            </p>
+          } @else {
+            <p class="price">No active variants</p>
+          }
 
-        <div class="actions">
-          <button type="button">View details</button>
-          <button type="button" class="primary">Buy now</button>
-        </div>
-      </article>
-    }
-  </div>
+          <div class="variants">
+            @for (variant of product.variants; track variant.id) {
+              <span class="badge">{{ variant.name }}</span>
+            }
+          </div>
+
+          <div class="actions">
+            <button type="button">View details</button>
+            <button type="button" class="primary">Add to cart</button>
+          </div>
+        </article>
+      }
+    </div>
+  } @else {
+    <p class="muted">Loading products...</p>
+  }
 </section>
