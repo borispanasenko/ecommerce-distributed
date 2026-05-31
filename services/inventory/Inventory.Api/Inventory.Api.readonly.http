@@ -1,28 +1,32 @@
 @InventoryApi_HostAddress = http://localhost:5245
+@sku = ARM-BLK
 
 ### Health check
+
 GET {{InventoryApi_HostAddress}}/health
 
-
 ### List warehouses
+
 GET {{InventoryApi_HostAddress}}/api/warehouses
 
-
 ### List locations
+
 GET {{InventoryApi_HostAddress}}/api/locations
 
-
 ### Get stock by SKU
-GET {{InventoryApi_HostAddress}}/api/stock/ARM-BLK
 
+### Change sku above if ARM-BLK does not exist in the local database.
+
+GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 ### Get stock movements
+
 GET {{InventoryApi_HostAddress}}/api/stock/movements
 
-
 ### Get stock movements by SKU
-GET {{InventoryApi_HostAddress}}/api/stock/movements?sku=ARM-BLK
 
+GET {{InventoryApi_HostAddress}}/api/stock/movements?sku={{sku}}
 
 ### Missing SKU should return 404
+
 GET {{InventoryApi_HostAddress}}/api/stock/MISSING-SKU
