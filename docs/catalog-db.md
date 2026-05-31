@@ -286,20 +286,47 @@ These may be added later only if there is a clear business reason.
 
 ---
 
-# First implementation milestone
+# Current implementation status
 
-Catalog Service v1 should support:
+Catalog Service currently supports:
 
 ```text
-GET /products
-GET /products/{id}
-GET /categories
+GET  /api/brands
+POST /api/brands
+
+GET  /api/categories
+POST /api/categories
+
+GET  /api/products
+GET  /api/products/{id}
+POST /api/products
+POST /api/products/{id}/variants
+POST /api/products/{id}/publish
+POST /api/products/{id}/archive
 ```
 
-The first version should:
+Current product lifecycle:
 
-* read data from `catalog_db`;
-* use EF Core migrations;
-* include seed data;
-* expose product variants and categories;
-* not depend on other services.
+```text
+Draft -> Active -> Archived
+```
+
+Current behavior:
+
+```text
+Products are created as Draft.
+Products require at least one active variant before publishing.
+GET /api/products returns only Active products.
+GET /api/products/{id} returns Draft, Active or Archived products.
+Archived products are hidden from the active product list.
+```
+
+Current tests:
+
+```text
+Product flow tests
+Product details tests
+Product archive tests
+Brand service tests
+Category service tests
+```
