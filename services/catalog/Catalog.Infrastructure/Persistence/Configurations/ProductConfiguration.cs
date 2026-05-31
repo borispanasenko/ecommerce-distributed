@@ -55,5 +55,7 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(x => x.BrandId);
+
+        builder.HasIndex(x => x.Status);
     }
 }

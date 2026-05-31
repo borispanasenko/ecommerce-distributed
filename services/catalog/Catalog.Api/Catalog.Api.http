@@ -1,6 +1,28 @@
-@Catalog.Api_HostAddress = http://localhost:5072
+@CatalogApi_HostAddress = http://localhost:5001
 
-GET {{Catalog.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Create product as Draft
+POST {{CatalogApi_HostAddress}}/api/products
+Content-Type: application/json
 
-###
+{
+  "brandId": null,
+  "name": "Desk Lamp",
+  "slug": "desk-lamp",
+  "description": "Minimal desk lamp for home office.",
+  "categoryIds": []
+}
+
+### Add variant
+POST {{CatalogApi_HostAddress}}/api/products/PUT_PRODUCT_ID_HERE/variants
+Content-Type: application/json
+
+{
+  "sku": "LAMP-BLK",
+  "name": "Black",
+  "priceAmountMinor": 4900,
+  "currency": "USD"
+}
+
+### Publish product
+POST {{CatalogApi_HostAddress}}/api/products/PUT_PRODUCT_ID_HERE/publish
+Content-Type: application/json

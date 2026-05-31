@@ -61,5 +61,11 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
 
         builder.HasIndex(x => x.ProductId);
         builder.HasIndex(x => x.VariantId);
+
+        builder.HasIndex(x => new { x.ProductId, x.SortOrder });
+
+        builder.HasIndex(x => x.ProductId)
+            .IsUnique()
+            .HasFilter("is_primary = true");
     }
 }
