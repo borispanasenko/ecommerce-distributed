@@ -19,4 +19,6 @@ public sealed class StorageLocation
     public List<StockItem> StockItems { get; set; } = [];
 
     public List<StockMovement> StockMovements { get; set; } = [];
+    
+    public List<StockReservation> StockReservations { get; set; } = [];
 }

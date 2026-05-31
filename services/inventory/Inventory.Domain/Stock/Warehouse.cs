@@ -19,4 +19,6 @@ public sealed class Warehouse
     public List<StockItem> StockItems { get; set; } = [];
 
     public List<StockMovement> StockMovements { get; set; } = [];
+
+    public List<StockReservation> StockReservations { get; set; } = [];
 }
