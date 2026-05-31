@@ -14,6 +14,10 @@ public interface IProductCommandService
     Task<ProductCommandResult<ProductCommandResponse>> PublishProductAsync(
         Guid productId,
         CancellationToken cancellationToken = default);
+
+    Task<ProductCommandResult<ProductCommandResponse>> ArchiveProductAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record CreateProductRequest(

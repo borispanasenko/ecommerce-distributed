@@ -250,4 +250,31 @@ public sealed class EfProductCommandService : IProductCommandService
                 product.Slug,
                 product.Status.ToString()));
     }
+
+    public async Task<ProductCommandResult<ProductCommandResponse>> ArchiveProductAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default)
+    {
+        var product = await _db.Products
+            .FirstOrDefaultAsync(x => x.Id == productId, cancellationToken);
+
+        if (product is null)
+        {
+            return ProductCommandResult<ProductCommandResponse>.Failure(
+                "product_not_found",
+                "Product was not found.");
+        }
+
+        product.Status = ProductStatus.Archived;
+        product.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return ProductCommandResult<ProductCommandResponse>.Success(
+            new ProductCommandResponse(
+                product.Id,
+                product.Name,
+                product.Slug,
+                product.Status.ToString()));
+    }
 }

@@ -93,6 +93,37 @@ public sealed class ProductQueriesTests
         Assert.Equal("Active", products[0].Status);
     }
 
+    [Fact]
+    public async Task GetProductsAsync_ShouldNotReturnArchivedProducts()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var commandService = new EfProductCommandService(dbContext);
+        var queries = new EfProductQueries(dbContext);
+
+        var productResult = await commandService.CreateProductAsync(new CreateProductRequest(
+            BrandId: null,
+            Name: "Desk Lamp",
+            Slug: "desk-lamp",
+            Description: null,
+            CategoryIds: Array.Empty<Guid>()));
+
+        await commandService.AddVariantAsync(
+            productResult.Value!.Id,
+            new AddProductVariantRequest(
+                Sku: "LAMP-BLK",
+                Name: "Black",
+                PriceAmountMinor: 4900,
+                Currency: "USD"));
+
+        await commandService.PublishProductAsync(productResult.Value.Id);
+        await commandService.ArchiveProductAsync(productResult.Value.Id);
+
+        var products = await queries.GetProductsAsync();
+
+        Assert.Empty(products);
+    }
+
     private static CatalogDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<CatalogDbContext>()

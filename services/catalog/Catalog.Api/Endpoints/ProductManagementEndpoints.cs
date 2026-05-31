@@ -102,6 +102,27 @@ public static class ProductManagementEndpoints
             return Results.Ok(result.Value);
         });
 
+        group.MapPost("/{productId:guid}/archive", async (
+            Guid productId,
+            IProductCommandService productCommandService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await productCommandService.ArchiveProductAsync(productId, cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new
+                {
+                    error = result.ErrorCode,
+                    message = result.ErrorMessage
+                });
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .WithName("ArchiveProduct")
+        .WithOpenApi();
+
         return app;
     }
 }

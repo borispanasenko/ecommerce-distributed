@@ -171,6 +171,38 @@ public sealed class ProductCommandServiceTests
         Assert.Equal("Active", publishResult.Value.Status);
     }
 
+    [Fact]
+    public async Task ArchiveProductAsync_ShouldArchiveProduct()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfProductCommandService(dbContext);
+
+        var productResult = await service.CreateProductAsync(new CreateProductRequest(
+            BrandId: null,
+            Name: "Desk Lamp",
+            Slug: "desk-lamp",
+            Description: null,
+            CategoryIds: Array.Empty<Guid>()));
+
+        var archiveResult = await service.ArchiveProductAsync(productResult.Value!.Id);
+
+        Assert.True(archiveResult.IsSuccess);
+        Assert.NotNull(archiveResult.Value);
+        Assert.Equal("Archived", archiveResult.Value.Status);
+    }
+
+    [Fact]
+    public async Task ArchiveProductAsync_ShouldReturnFailure_WhenProductDoesNotExist()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfProductCommandService(dbContext);
+
+        var archiveResult = await service.ArchiveProductAsync(Guid.NewGuid());
+
+        Assert.False(archiveResult.IsSuccess);
+        Assert.Equal("product_not_found", archiveResult.ErrorCode);
+    }
+
     private static CatalogDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<CatalogDbContext>()
