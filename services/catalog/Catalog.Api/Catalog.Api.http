@@ -1,28 +1,60 @@
-@CatalogApi_HostAddress = http://localhost:5001
+@CatalogApi_HostAddress = http://localhost:5072
+
+### Health check
+GET {{CatalogApi_HostAddress}}/health
+
+
+### List active products
+GET {{CatalogApi_HostAddress}}/api/products
+
+
+### Get seeded product details
+GET {{CatalogApi_HostAddress}}/api/products/30000000-0000-0000-0000-000000000001
+
 
 ### Create product as Draft
+# @name createProduct
 POST {{CatalogApi_HostAddress}}/api/products
 Content-Type: application/json
 
 {
   "brandId": null,
-  "name": "Desk Lamp",
-  "slug": "desk-lamp",
-  "description": "Minimal desk lamp for home office.",
+  "name": "Standing Desk Mat",
+  "slug": "standing-desk-mat",
+  "description": "Comfort mat for standing desks and home office setups.",
   "categoryIds": []
 }
 
-### Add variant
-POST {{CatalogApi_HostAddress}}/api/products/PUT_PRODUCT_ID_HERE/variants
+
+### Add variant to created product
+@createdProductId = {{createProduct.response.body.$.id}}
+
+POST {{CatalogApi_HostAddress}}/api/products/{{createdProductId}}/variants
 Content-Type: application/json
 
 {
-  "sku": "LAMP-BLK",
+  "sku": "MAT-BLK",
   "name": "Black",
-  "priceAmountMinor": 4900,
+  "priceAmountMinor": 5900,
   "currency": "USD"
 }
 
-### Publish product
-POST {{CatalogApi_HostAddress}}/api/products/PUT_PRODUCT_ID_HERE/publish
-Content-Type: application/json
+
+### Publish created product
+POST {{CatalogApi_HostAddress}}/api/products/{{createdProductId}}/publish
+
+
+### Get created product details
+GET {{CatalogApi_HostAddress}}/api/products/{{createdProductId}}
+
+
+### Archive created product
+POST {{CatalogApi_HostAddress}}/api/products/{{createdProductId}}/archive
+
+
+### Get archived product details
+GET {{CatalogApi_HostAddress}}/api/products/{{createdProductId}}
+
+
+### Missing product should return 404
+GET {{CatalogApi_HostAddress}}/api/products/00000000-0000-0000-0000-000000000000
