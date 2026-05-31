@@ -1,6 +1,5 @@
 using Catalog.Infrastructure;
 using Catalog.Infrastructure.Persistence;
-using Catalog.Application.Products.Queries;
 using Catalog.Api.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -41,17 +40,6 @@ app.MapGet("/health", () => Results.Ok(new
     timestamp = DateTimeOffset.UtcNow
 }))
 .WithName("HealthCheck")
-.WithOpenApi();
-
-app.MapGet("/api/products", async (
-    IProductQueries productQueries,
-    CancellationToken cancellationToken) =>
-{
-    var products = await productQueries.GetProductsAsync(cancellationToken);
-
-    return Results.Ok(products);
-})
-.WithName("GetProducts")
 .WithOpenApi();
 
 app.MapProductManagementEndpoints();
