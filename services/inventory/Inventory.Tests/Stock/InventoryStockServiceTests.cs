@@ -343,6 +343,267 @@ public sealed class InventoryStockServiceTests
         });
     }
 
+    [Fact]
+    public async Task ReserveStockAsync_ShouldIncreaseReservedQuantity()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfInventoryStockService(dbContext);
+
+        var setup = await CreateWarehouseAndLocationAsync(service);
+
+        await service.ReceiveStockAsync(new ReceiveStockRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 75,
+            Reason: "Initial stock"));
+
+        var reservationResult = await service.ReserveStockAsync(new CreateStockReservationRequest(
+            Sku: "arm-blk",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 10,
+            Reference: "ORDER-1001"));
+
+        Assert.True(reservationResult.IsSuccess);
+        Assert.NotNull(reservationResult.Value);
+        Assert.Equal("ARM-BLK", reservationResult.Value.Sku);
+        Assert.Equal(10, reservationResult.Value.Quantity);
+        Assert.Equal("Active", reservationResult.Value.Status);
+        Assert.Equal("ORDER-1001", reservationResult.Value.Reference);
+
+        var stock = await service.GetStockBySkuAsync("ARM-BLK");
+
+        Assert.NotNull(stock);
+        Assert.Equal(75, stock.TotalOnHandQuantity);
+        Assert.Equal(10, stock.TotalReservedQuantity);
+        Assert.Equal(65, stock.TotalAvailableQuantity);
+    }
+
+    [Fact]
+    public async Task ReserveStockAsync_ShouldRejectInsufficientStock()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfInventoryStockService(dbContext);
+
+        var setup = await CreateWarehouseAndLocationAsync(service);
+
+        await service.ReceiveStockAsync(new ReceiveStockRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 5,
+            Reason: "Initial stock"));
+
+        var reservationResult = await service.ReserveStockAsync(new CreateStockReservationRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 10,
+            Reference: "ORDER-1001"));
+
+        Assert.False(reservationResult.IsSuccess);
+        Assert.Equal("insufficient_stock", reservationResult.ErrorCode);
+
+        var stock = await service.GetStockBySkuAsync("ARM-BLK");
+
+        Assert.NotNull(stock);
+        Assert.Equal(5, stock.TotalOnHandQuantity);
+        Assert.Equal(0, stock.TotalReservedQuantity);
+        Assert.Equal(5, stock.TotalAvailableQuantity);
+    }
+
+    [Fact]
+    public async Task ReleaseReservationAsync_ShouldReleaseActiveReservation()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfInventoryStockService(dbContext);
+
+        var setup = await CreateWarehouseAndLocationAsync(service);
+
+        await service.ReceiveStockAsync(new ReceiveStockRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 75,
+            Reason: "Initial stock"));
+
+        var reservationResult = await service.ReserveStockAsync(new CreateStockReservationRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 10,
+            Reference: "ORDER-1001"));
+
+        var releaseResult = await service.ReleaseReservationAsync(reservationResult.Value!.Id);
+
+        Assert.True(releaseResult.IsSuccess);
+        Assert.NotNull(releaseResult.Value);
+        Assert.Equal("Released", releaseResult.Value.Status);
+        Assert.NotNull(releaseResult.Value.ReleasedAt);
+
+        var stock = await service.GetStockBySkuAsync("ARM-BLK");
+
+        Assert.NotNull(stock);
+        Assert.Equal(75, stock.TotalOnHandQuantity);
+        Assert.Equal(0, stock.TotalReservedQuantity);
+        Assert.Equal(75, stock.TotalAvailableQuantity);
+    }
+
+    [Fact]
+    public async Task CommitReservationAsync_ShouldCommitActiveReservationAndDecreaseStock()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfInventoryStockService(dbContext);
+
+        var setup = await CreateWarehouseAndLocationAsync(service);
+
+        await service.ReceiveStockAsync(new ReceiveStockRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 75,
+            Reason: "Initial stock"));
+
+        var reservationResult = await service.ReserveStockAsync(new CreateStockReservationRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 15,
+            Reference: "ORDER-1002"));
+
+        var commitResult = await service.CommitReservationAsync(reservationResult.Value!.Id);
+
+        Assert.True(commitResult.IsSuccess);
+        Assert.NotNull(commitResult.Value);
+        Assert.Equal("Committed", commitResult.Value.Status);
+        Assert.NotNull(commitResult.Value.CommittedAt);
+
+        var stock = await service.GetStockBySkuAsync("ARM-BLK");
+
+        Assert.NotNull(stock);
+        Assert.Equal(60, stock.TotalOnHandQuantity);
+        Assert.Equal(0, stock.TotalReservedQuantity);
+        Assert.Equal(60, stock.TotalAvailableQuantity);
+    }
+
+    [Fact]
+    public async Task ReleaseReservationAsync_ShouldRejectAlreadyReleasedReservation()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfInventoryStockService(dbContext);
+
+        var setup = await CreateWarehouseAndLocationAsync(service);
+
+        await service.ReceiveStockAsync(new ReceiveStockRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 75,
+            Reason: "Initial stock"));
+
+        var reservationResult = await service.ReserveStockAsync(new CreateStockReservationRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 10,
+            Reference: "ORDER-1001"));
+
+        var firstRelease = await service.ReleaseReservationAsync(reservationResult.Value!.Id);
+        var secondRelease = await service.ReleaseReservationAsync(reservationResult.Value.Id);
+
+        Assert.True(firstRelease.IsSuccess);
+        Assert.False(secondRelease.IsSuccess);
+        Assert.Equal("reservation_not_active", secondRelease.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CommitReservationAsync_ShouldRejectReleasedReservation()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfInventoryStockService(dbContext);
+
+        var setup = await CreateWarehouseAndLocationAsync(service);
+
+        await service.ReceiveStockAsync(new ReceiveStockRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 75,
+            Reason: "Initial stock"));
+
+        var reservationResult = await service.ReserveStockAsync(new CreateStockReservationRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 10,
+            Reference: "ORDER-1001"));
+
+        var releaseResult = await service.ReleaseReservationAsync(reservationResult.Value!.Id);
+        var commitResult = await service.CommitReservationAsync(reservationResult.Value.Id);
+
+        Assert.True(releaseResult.IsSuccess);
+        Assert.False(commitResult.IsSuccess);
+        Assert.Equal("reservation_not_active", commitResult.ErrorCode);
+    }
+
+    [Fact]
+    public async Task GetStockMovementsAsync_ShouldIncludeReservationReleaseAndShipmentMovements()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfInventoryStockService(dbContext);
+
+        var setup = await CreateWarehouseAndLocationAsync(service);
+
+        await service.ReceiveStockAsync(new ReceiveStockRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 75,
+            Reason: "Initial stock"));
+
+        var reservationToRelease = await service.ReserveStockAsync(new CreateStockReservationRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 10,
+            Reference: "ORDER-1001"));
+
+        await service.ReleaseReservationAsync(reservationToRelease.Value!.Id);
+
+        var reservationToCommit = await service.ReserveStockAsync(new CreateStockReservationRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 15,
+            Reference: "ORDER-1002"));
+
+        await service.CommitReservationAsync(reservationToCommit.Value!.Id);
+
+        var movements = await service.GetStockMovementsAsync("ARM-BLK");
+
+        Assert.Equal(5, movements.Count);
+        Assert.Equal(1, movements.Count(movement => movement.Type == "Receipt"));
+        Assert.Equal(2, movements.Count(movement => movement.Type == "Reservation"));
+        Assert.Equal(1, movements.Count(movement => movement.Type == "Release"));
+        Assert.Equal(1, movements.Count(movement => movement.Type == "Shipment"));
+
+        Assert.Contains(movements, movement =>
+            movement.Type == "Reservation" &&
+            movement.Quantity == 10 &&
+            movement.Reason == "ORDER-1001");
+
+        Assert.Contains(movements, movement =>
+            movement.Type == "Release" &&
+            movement.Quantity == -10 &&
+            movement.Reason == "ORDER-1001");
+
+        Assert.Contains(movements, movement =>
+            movement.Type == "Shipment" &&
+            movement.Quantity == -15 &&
+            movement.Reason == "ORDER-1002");
+    }
+
     private static async Task<(Guid WarehouseId, Guid LocationId)> CreateWarehouseAndLocationAsync(
         EfInventoryStockService service)
     {
