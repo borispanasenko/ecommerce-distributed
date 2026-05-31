@@ -1,3 +1,7 @@
+### WARNING
+### This file changes local development data.
+### Use *.readonly.http for safe read-only checks.
+
 @CatalogApi_HostAddress = http://localhost:5072
 
 ### Health check

@@ -1,0 +1,24 @@
+@CatalogApi_HostAddress = http://localhost:5072
+
+### Health check
+GET {{CatalogApi_HostAddress}}/health
+
+
+### List active products
+GET {{CatalogApi_HostAddress}}/api/products
+
+
+### Get seeded product details
+GET {{CatalogApi_HostAddress}}/api/products/30000000-0000-0000-0000-000000000001
+
+
+### List brands
+GET {{CatalogApi_HostAddress}}/api/brands
+
+
+### List categories
+GET {{CatalogApi_HostAddress}}/api/categories
+
+
+### Missing product should return 404
+GET {{CatalogApi_HostAddress}}/api/products/00000000-0000-0000-0000-000000000000

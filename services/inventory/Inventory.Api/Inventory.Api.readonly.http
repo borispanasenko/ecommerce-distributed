@@ -1,0 +1,28 @@
+@InventoryApi_HostAddress = http://localhost:5245
+
+### Health check
+GET {{InventoryApi_HostAddress}}/health
+
+
+### List warehouses
+GET {{InventoryApi_HostAddress}}/api/warehouses
+
+
+### List locations
+GET {{InventoryApi_HostAddress}}/api/locations
+
+
+### Get stock by SKU
+GET {{InventoryApi_HostAddress}}/api/stock/ARM-BLK
+
+
+### Get stock movements
+GET {{InventoryApi_HostAddress}}/api/stock/movements
+
+
+### Get stock movements by SKU
+GET {{InventoryApi_HostAddress}}/api/stock/movements?sku=ARM-BLK
+
+
+### Missing SKU should return 404
+GET {{InventoryApi_HostAddress}}/api/stock/MISSING-SKU
