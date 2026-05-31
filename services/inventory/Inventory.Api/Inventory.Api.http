@@ -1,6 +1,101 @@
-@Inventory.Api_HostAddress = http://localhost:5245
+@InventoryApi_HostAddress = http://localhost:5245
 
-GET {{Inventory.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Health check
+GET {{InventoryApi_HostAddress}}/health
 
-###
+
+### List warehouses
+GET {{InventoryApi_HostAddress}}/api/warehouses
+
+
+### Create warehouse
+# @name createWarehouse
+POST {{InventoryApi_HostAddress}}/api/warehouses
+Content-Type: application/json
+
+{
+  "code": "MAIN",
+  "name": "Main Warehouse"
+}
+
+
+### List warehouses after create
+GET {{InventoryApi_HostAddress}}/api/warehouses
+
+
+### Create location
+@warehouseId = {{createWarehouse.response.body.$.id}}
+
+# @name createLocation
+POST {{InventoryApi_HostAddress}}/api/locations
+Content-Type: application/json
+
+{
+  "warehouseId": "{{warehouseId}}",
+  "code": "A-01-01"
+}
+
+
+### List locations
+GET {{InventoryApi_HostAddress}}/api/locations
+
+
+### List locations by warehouse
+GET {{InventoryApi_HostAddress}}/api/locations?warehouseId={{warehouseId}}
+
+
+### Receive stock
+@locationId = {{createLocation.response.body.$.id}}
+
+POST {{InventoryApi_HostAddress}}/api/stock/receipts
+Content-Type: application/json
+
+{
+  "sku": "ARM-BLK",
+  "warehouseId": "{{warehouseId}}",
+  "locationId": "{{locationId}}",
+  "quantity": 50,
+  "reason": "Initial stock"
+}
+
+
+### Receive more stock
+POST {{InventoryApi_HostAddress}}/api/stock/receipts
+Content-Type: application/json
+
+{
+  "sku": "ARM-BLK",
+  "warehouseId": "{{warehouseId}}",
+  "locationId": "{{locationId}}",
+  "quantity": 25,
+  "reason": "Second receipt"
+}
+
+
+### Get stock by SKU
+GET {{InventoryApi_HostAddress}}/api/stock/ARM-BLK
+
+
+### Get stock movements
+GET {{InventoryApi_HostAddress}}/api/stock/movements
+
+
+### Get stock movements by SKU
+GET {{InventoryApi_HostAddress}}/api/stock/movements?sku=ARM-BLK
+
+
+### Missing SKU should return 404
+GET {{InventoryApi_HostAddress}}/api/stock/MISSING-SKU
+
+
+### Invalid receipt quantity should return 400
+POST {{InventoryApi_HostAddress}}/api/stock/receipts
+Content-Type: application/json
+
+{
+  "sku": "ARM-BLK",
+  "warehouseId": "{{warehouseId}}",
+  "locationId": "{{locationId}}",
+  "quantity": 0,
+  "reason": "Invalid receipt"
+}
