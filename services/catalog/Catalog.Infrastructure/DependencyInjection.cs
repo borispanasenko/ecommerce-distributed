@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Catalog.Application.Products.Queries;
 using Catalog.Infrastructure.Products;
 using Catalog.Application.Products.Commands;
+using Catalog.Application.ReferenceData;
+using Catalog.Infrastructure.ReferenceData;
 
 namespace Catalog.Infrastructure;
 
@@ -29,6 +31,7 @@ public static class DependencyInjection
 
         services.AddScoped<IProductQueries, EfProductQueries>();
         services.AddScoped<IProductCommandService, EfProductCommandService>();
+        services.AddScoped<ICatalogReferenceDataService, EfCatalogReferenceDataService>();
 
         return services;
     }

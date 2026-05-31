@@ -43,5 +43,6 @@ app.MapGet("/health", () => Results.Ok(new
 .WithOpenApi();
 
 app.MapProductManagementEndpoints();
+app.MapCatalogReferenceDataEndpoints();
 
 app.Run();
