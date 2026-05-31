@@ -2,6 +2,8 @@ using Inventory.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Inventory.Application.Stock;
+using Inventory.Infrastructure.Stock;
 
 namespace Inventory.Infrastructure;
 
@@ -23,6 +25,8 @@ public static class DependencyInjection
         {
             options.UseNpgsql(connectionString);
         });
+
+        services.AddScoped<IInventoryStockService, EfInventoryStockService>();
 
         return services;
     }

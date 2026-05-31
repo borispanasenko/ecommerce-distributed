@@ -1,4 +1,5 @@
 using Inventory.Infrastructure;
+using Inventory.Api.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,5 +26,7 @@ app.MapGet("/health", () => Results.Ok(new
 }))
 .WithName("HealthCheck")
 .WithOpenApi();
+
+app.MapInventoryStockEndpoints();
 
 app.Run();
