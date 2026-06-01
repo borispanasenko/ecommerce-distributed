@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Ordering.Infrastructure.Persistence;
 using Ordering.Application.Orders;
 using Ordering.Infrastructure.Orders;
+using Ordering.Application.Inventory;
+using Ordering.Infrastructure.Inventory;
 
 namespace Ordering.Infrastructure;
 
@@ -27,6 +29,19 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IOrderingService, EfOrderingService>();
+
+        var inventoryApiBaseUrl = configuration["InventoryApi:BaseUrl"];
+
+        if (string.IsNullOrWhiteSpace(inventoryApiBaseUrl))
+        {
+            throw new InvalidOperationException(
+                "Inventory API base URL 'InventoryApi:BaseUrl' is not configured.");
+        }
+
+        services.AddHttpClient<IInventoryClient, HttpInventoryClient>(client =>
+        {
+            client.BaseAddress = new Uri(inventoryApiBaseUrl);
+        });
 
         return services;
     }

@@ -27,7 +27,9 @@ public sealed record CreateOrderItemRequest(
     string VariantName,
     long UnitPriceAmountMinor,
     string Currency,
-    int Quantity);
+    int Quantity,
+    Guid WarehouseId,
+    Guid LocationId);
 
 public sealed record OrderListItemDto(
     Guid Id,

@@ -2,16 +2,21 @@ using Microsoft.EntityFrameworkCore;
 using Ordering.Application.Orders;
 using Ordering.Domain.Orders;
 using Ordering.Infrastructure.Persistence;
+using Ordering.Application.Inventory;
 
 namespace Ordering.Infrastructure.Orders;
 
 public sealed class EfOrderingService : IOrderingService
 {
     private readonly OrderingDbContext _dbContext;
+    private readonly IInventoryClient _inventoryClient;
 
-    public EfOrderingService(OrderingDbContext dbContext)
+    public EfOrderingService(
+        OrderingDbContext dbContext,
+        IInventoryClient inventoryClient)
     {
         _dbContext = dbContext;
+        _inventoryClient = inventoryClient;
     }
 
     public async Task<OrderingResult<OrderDetailsDto>> CreateOrderAsync(
@@ -92,6 +97,20 @@ public sealed class EfOrderingService : IOrderingService
                     "Quantity must be greater than zero.");
             }
 
+            if (item.WarehouseId == Guid.Empty)
+            {
+                return OrderingResult<OrderDetailsDto>.Failure(
+                    "warehouse_id_required",
+                    "Warehouse id is required.");
+            }
+
+            if (item.LocationId == Guid.Empty)
+            {
+                return OrderingResult<OrderDetailsDto>.Failure(
+                    "location_id_required",
+                    "Location id is required.");
+            }
+
             if (string.IsNullOrWhiteSpace(item.Currency) || item.Currency.Trim().Length != 3)
             {
                 return OrderingResult<OrderDetailsDto>.Failure(
@@ -130,8 +149,36 @@ public sealed class EfOrderingService : IOrderingService
             UpdatedAt = now
         };
 
+        var createdReservationIds = new List<Guid>();
+
         foreach (var item in normalizedItems)
         {
+            var reservationResult = await _inventoryClient.ReserveStockAsync(
+                new ReserveStockRequest(
+                    Sku: item.Sku,
+                    WarehouseId: item.WarehouseId,
+                    LocationId: item.LocationId,
+                    Quantity: item.Quantity,
+                    Reference: $"ORDER-{order.Id}"),
+                cancellationToken);
+
+            if (!reservationResult.IsSuccess)
+            {
+                foreach (var reservationId in createdReservationIds)
+                {
+                    await _inventoryClient.ReleaseReservationAsync(reservationId, cancellationToken);
+                }
+
+                return OrderingResult<OrderDetailsDto>.Failure(
+                    reservationResult.ErrorCode ?? "inventory_reservation_failed",
+                    reservationResult.ErrorMessage ?? "Inventory reservation failed.");
+            }
+
+            var inventoryReservationId = reservationResult.Value!.Id;
+            createdReservationIds.Add(inventoryReservationId);
+
+
+
             var lineTotal = item.UnitPriceAmountMinor * item.Quantity;
 
             order.Items.Add(new OrderItem
@@ -148,15 +195,27 @@ public sealed class EfOrderingService : IOrderingService
                 Currency = item.Currency,
                 Quantity = item.Quantity,
                 LineTotalAmountMinor = lineTotal,
-                InventoryReservationId = null
+                InventoryReservationId = inventoryReservationId
             });
 
             order.TotalAmountMinor += lineTotal;
         }
 
-        _dbContext.Orders.Add(order);
+        try
+        {
+            _dbContext.Orders.Add(order);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            foreach (var reservationId in createdReservationIds)
+            {
+                await _inventoryClient.ReleaseReservationAsync(reservationId, cancellationToken);
+            }
+
+            throw;
+        }
 
         return OrderingResult<OrderDetailsDto>.Success(ToDetailsDto(order));
     }
