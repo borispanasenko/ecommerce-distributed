@@ -1,6 +1,93 @@
-@Ordering.Api_HostAddress = http://localhost:5172
+### WARNING
+### This file changes local development data.
+### Change runId before running the full flow again.
 
-GET {{Ordering.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+@OrderingApi_HostAddress = http://localhost:5172
+@runId = 001
 
-###
+### Health check
+GET {{OrderingApi_HostAddress}}/health
+
+
+### List orders
+GET {{OrderingApi_HostAddress}}/api/orders
+
+
+### Create order
+# @name createOrder
+POST {{OrderingApi_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Test Customer {{runId}}",
+  "customerEmail": "test-{{runId}}@example.com",
+  "items": [
+    {
+      "productId": "a301a968-7477-4db5-bafd-edfb3bd03675",
+      "productVariantId": "9572fb9d-f059-401e-9041-7fc75f8cb414",
+      "sku": "ARM-BLK",
+      "productName": "Monitor Arm",
+      "variantName": "Black",
+      "unitPriceAmountMinor": 6900,
+      "currency": "USD",
+      "quantity": 2
+    }
+  ]
+}
+
+
+### Get created order details
+@orderId = {{createOrder.response.body.$.id}}
+
+GET {{OrderingApi_HostAddress}}/api/orders/{{orderId}}
+
+
+### List orders after create
+GET {{OrderingApi_HostAddress}}/api/orders
+
+
+### Create invalid order without items should return 400
+POST {{OrderingApi_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Invalid Customer",
+  "customerEmail": "invalid@example.com",
+  "items": []
+}
+
+
+### Create invalid order with mixed currencies should return 400
+POST {{OrderingApi_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Invalid Customer",
+  "customerEmail": "invalid@example.com",
+  "items": [
+    {
+      "productId": "a301a968-7477-4db5-bafd-edfb3bd03675",
+      "productVariantId": "9572fb9d-f059-401e-9041-7fc75f8cb414",
+      "sku": "ARM-BLK",
+      "productName": "Monitor Arm",
+      "variantName": "Black",
+      "unitPriceAmountMinor": 6900,
+      "currency": "USD",
+      "quantity": 1
+    },
+    {
+      "productId": "a301a968-7477-4db5-bafd-edfb3bd03675",
+      "productVariantId": "9572fb9d-f059-401e-9041-7fc75f8cb414",
+      "sku": "ARM-BLK",
+      "productName": "Monitor Arm",
+      "variantName": "Black",
+      "unitPriceAmountMinor": 6900,
+      "currency": "EUR",
+      "quantity": 1
+    }
+  ]
+}
+
+
+### Missing order should return 404
+GET {{OrderingApi_HostAddress}}/api/orders/00000000-0000-0000-0000-000000000000

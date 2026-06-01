@@ -1,0 +1,19 @@
+@OrderingApi_HostAddress = http://localhost:5172
+
+### Health check
+GET {{OrderingApi_HostAddress}}/health
+
+
+### List orders
+GET {{OrderingApi_HostAddress}}/api/orders
+
+
+### Get known order details
+### Replace orderId with an existing order id from GET /api/orders.
+@orderId = PUT_ORDER_ID_HERE
+
+GET {{OrderingApi_HostAddress}}/api/orders/{{orderId}}
+
+
+### Missing order should return 404
+GET {{OrderingApi_HostAddress}}/api/orders/00000000-0000-0000-0000-000000000000
