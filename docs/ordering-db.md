@@ -74,23 +74,26 @@ Order statuses:
 | 4     | Cancelled      | Order was cancelled                  |
 | 5     | Shipped        | Order was shipped                    |
 
-Current implemented status:
+Current implemented statuses:
 
 ```text
 PendingPayment
+Cancelled
 ```
 
 Notes:
 
 * Orders are currently created as `PendingPayment`.
+* Orders can be cancelled while they are in `PendingPayment`.
 * `total_amount_minor` stores money in minor units.
 * Example: `13800` means `138.00`.
 
 Rules:
 
+* Order must contain at least one item.
+* Only `PendingPayment` orders can be cancelled.
 * `total_amount_minor` must be greater than or equal to `0`.
 * `currency` must have `3` characters.
-* Order must contain at least one item.
 * All order items must use the same currency.
 
 ---
@@ -229,25 +232,38 @@ Ordering Service currently supports:
 GET  /api/orders
 GET  /api/orders/{id}
 POST /api/orders
+POST /api/orders/{id}/cancel
 ```
 
 Current ordering flow:
 
 ```text
 Create order
+Reserve Inventory stock
+Store inventory_reservation_id on order item
 List orders
 Get order details
+Cancel order
+Release Inventory reservation
 ```
 
 Current behavior:
 
 ```text
 Orders are created as PendingPayment.
+Creating an order reserves stock through Inventory Service.
 Order items store product snapshot data.
+Order items store inventory_reservation_id returned by Inventory Service.
 Line totals are calculated from unit price and quantity.
 Order total is calculated as the sum of line totals.
 Orders with empty item lists are rejected.
 Orders with mixed item currencies are rejected.
+Orders without warehouse_id or location_id are rejected.
+If Inventory reservation fails, order creation is rejected.
+If order persistence fails after reservation, Ordering tries to release created reservations.
+Only PendingPayment orders can be cancelled.
+Cancelling an order releases Inventory reservations.
+Cancelled orders cannot be cancelled again.
 GET /api/orders returns order summaries.
 GET /api/orders/{id} returns order details.
 ```
@@ -256,18 +272,21 @@ Current tests:
 
 ```text
 Create order tests
+Inventory reservation integration tests
 Order total calculation tests
 Validation tests
 Order list tests
 Order details tests
+Cancel order tests
 Missing order tests
 ```
 
 Future work:
 
 ```text
-Reserve stock through Inventory.
-Release reservation on cancel.
-Commit reservation after payment or shipment.
 Connect Payment service.
+Mark order as Paid after successful payment.
+Commit Inventory reservation after payment or shipment.
+Handle payment failure.
+Add order event history.
 ```

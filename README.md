@@ -7,7 +7,7 @@ Small distributed commerce system.
 ```text
 catalog   - products, brands, categories, variants/SKUs
 inventory - warehouses, locations, stock, reservations
-ordering  - orders and product snapshots
+ordering  - orders, product snapshots and inventory reservatios
 payment   - payment simulation
 frontend  - Angular UI
 ```
@@ -17,7 +17,7 @@ frontend  - Angular UI
 ```text
 Catalog   - working backend flow, API, tests, documentation
 Inventory - working backend flow, API, tests, documentation
-Ordering  - working backend flow, API, tests, documentation
+Ordering  - working backend flow, Inventory integration, API, tests, documentation
 Payment   - scaffold
 Frontend  - scaffold
 ```
@@ -91,10 +91,14 @@ POST /api/stock/reservations/{id}/commit
 
 ```text
 Create order from product snapshot data
+Reserve Inventory stock
+Store inventoryReservationId on order item
 Calculate line totals
 Calculate order total
 List orders
 Get order details
+Cancel order
+Release Inventory reservation
 ```
 
 ## Ordering API
@@ -105,6 +109,29 @@ GET  /health
 GET  /api/orders
 GET  /api/orders/{id}
 POST /api/orders
+POST /api/orders/{id}/cancel
+```
+
+## End-to-end flow
+
+```text
+Catalog defines product variants and SKUs.
+Inventory stores stock by SKU.
+Ordering creates orders from product snapshot data.
+Ordering reserves Inventory stock when an order is created.
+Ordering releases Inventory reservation when an order is cancelled.
+```
+
+Current completed end-to-end scenario:
+
+```text
+Product exists in Catalog
+Stock exists in Inventory
+Order is created in Ordering
+Inventory stock is reserved
+Order stores inventoryReservationId
+Order is cancelled
+Inventory reservation is released
 ```
 
 ## Local infrastructure
@@ -157,9 +184,22 @@ dotnet run --project services/inventory/Inventory.Api/Inventory.Api.csproj
 
 ## Run Ordering API locally
 
+Ordering API requires Inventory API for stock reservations.
+
+Run Inventory API first:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development \
+ConnectionStrings__DefaultConnection="Host=localhost;Port=5435;Database=inventory_db;Username=postgres;Password=postgres" \
+dotnet run --project services/inventory/Inventory.Api/Inventory.Api.csproj
+```
+
+Then run Ordering API:
+
 ```bash
 ASPNETCORE_ENVIRONMENT=Development \
 ConnectionStrings__DefaultConnection="Host=localhost;Port=5434;Database=ordering_db;Username=postgres;Password=postgres" \
+InventoryApi__BaseUrl="http://localhost:5245" \
 dotnet run --project services/ordering/Ordering.Api/Ordering.Api.csproj
 ```
 
@@ -267,3 +307,7 @@ Inventory stores stock by SKU.
 Ordering may reference Catalog data by `product_id`, `product_variant_id` and `sku`.
 
 Ordering may reference Inventory reservations by `inventory_reservation_id`.
+
+Ordering creates Inventory reservations when orders are created.
+
+Ordering releases Inventory reservations when orders are cancelled.
