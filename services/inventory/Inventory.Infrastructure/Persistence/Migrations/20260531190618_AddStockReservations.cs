@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Inventory.Infrastructure.Migrations
+namespace Inventory.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
     public partial class AddStockReservations : Migration

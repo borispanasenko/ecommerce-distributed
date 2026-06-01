@@ -8,7 +8,7 @@ using Ordering.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace Ordering.Infrastructure.Migrations
+namespace Ordering.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(OrderingDbContext))]
     partial class OrderingDbContextModelSnapshot : ModelSnapshot
