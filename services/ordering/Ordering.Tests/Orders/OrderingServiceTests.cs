@@ -330,6 +330,59 @@ public sealed class OrderingServiceTests
         Assert.Null(order);
     }
 
+    [Fact]
+    public async Task CancelOrderAsync_ShouldCancelPendingPaymentOrderAndReleaseReservation()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var result = await service.CancelOrderAsync(createdOrder.Value!.Id);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("Cancelled", result.Value.Status);
+
+        Assert.Single(inventoryClient.ReleaseRequests);
+        Assert.Equal(
+            createdOrder.Value.Items[0].InventoryReservationId,
+            inventoryClient.ReleaseRequests[0]);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Cancelled", order.Status);
+    }
+
+    [Fact]
+    public async Task CancelOrderAsync_ShouldRejectMissingOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+
+        var result = await service.CancelOrderAsync(Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("order_not_found", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CancelOrderAsync_ShouldRejectAlreadyCancelledOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var firstCancel = await service.CancelOrderAsync(createdOrder.Value!.Id);
+        var secondCancel = await service.CancelOrderAsync(createdOrder.Value.Id);
+
+        Assert.True(firstCancel.IsSuccess);
+        Assert.False(secondCancel.IsSuccess);
+        Assert.Equal("order_cannot_be_cancelled", secondCancel.ErrorCode);
+    }
+
     private static EfOrderingService CreateService(
         OrderingDbContext dbContext,
         out FakeInventoryClient inventoryClient)

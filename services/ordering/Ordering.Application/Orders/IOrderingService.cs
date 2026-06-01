@@ -12,6 +12,10 @@ public interface IOrderingService
     Task<OrderDetailsDto?> GetOrderByIdAsync(
         Guid orderId,
         CancellationToken cancellationToken = default);
+
+    Task<OrderingResult<OrderDetailsDto>> CancelOrderAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record CreateOrderRequest(

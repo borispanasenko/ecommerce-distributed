@@ -62,6 +62,27 @@ public static class OrderingEndpoints
         .WithName("CreateOrder")
         .WithOpenApi();
 
+        orders.MapPost("/{orderId:guid}/cancel", async (
+            Guid orderId,
+            IOrderingService orderingService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await orderingService.CancelOrderAsync(orderId, cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new
+                {
+                    error = result.ErrorCode,
+                    message = result.ErrorMessage
+                });
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .WithName("CancelOrder")
+        .WithOpenApi();
+
         return app;
     }
 }

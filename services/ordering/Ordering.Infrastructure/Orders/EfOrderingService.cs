@@ -252,6 +252,55 @@ public sealed class EfOrderingService : IOrderingService
         return order is null ? null : ToDetailsDto(order);
     }
 
+    public async Task<OrderingResult<OrderDetailsDto>> CancelOrderAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        var order = await _dbContext.Orders
+            .Include(order => order.Items)
+            .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
+
+        if (order is null)
+        {
+            return OrderingResult<OrderDetailsDto>.Failure(
+                "order_not_found",
+                "Order was not found.");
+        }
+
+        if (order.Status != OrderStatus.PendingPayment)
+        {
+            return OrderingResult<OrderDetailsDto>.Failure(
+                "order_cannot_be_cancelled",
+                "Only pending payment orders can be cancelled.");
+        }
+
+        foreach (var item in order.Items)
+        {
+            if (item.InventoryReservationId is null)
+            {
+                continue;
+            }
+
+            var releaseResult = await _inventoryClient.ReleaseReservationAsync(
+                item.InventoryReservationId.Value,
+                cancellationToken);
+
+            if (!releaseResult.IsSuccess)
+            {
+                return OrderingResult<OrderDetailsDto>.Failure(
+                    releaseResult.ErrorCode ?? "inventory_reservation_release_failed",
+                    releaseResult.ErrorMessage ?? "Inventory reservation release failed.");
+            }
+        }
+
+        order.Status = OrderStatus.Cancelled;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return OrderingResult<OrderDetailsDto>.Success(ToDetailsDto(order));
+    }
+
     private static OrderDetailsDto ToDetailsDto(Order order)
     {
         return new OrderDetailsDto(
