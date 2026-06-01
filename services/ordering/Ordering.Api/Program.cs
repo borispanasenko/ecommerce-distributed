@@ -1,4 +1,6 @@
 using Ordering.Infrastructure;
+using Ordering.Api.Endpoints;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,5 +29,7 @@ app.MapGet("/health", () => Results.Ok(new
 }))
 .WithName("HealthCheck")
 .WithOpenApi();
+
+app.MapOrderingEndpoints();
 
 app.Run();

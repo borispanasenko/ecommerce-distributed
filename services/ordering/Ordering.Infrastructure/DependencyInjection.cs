@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Ordering.Infrastructure.Persistence;
+using Ordering.Application.Orders;
+using Ordering.Infrastructure.Orders;
 
 namespace Ordering.Infrastructure;
 
@@ -23,6 +25,8 @@ public static class DependencyInjection
         {
             options.UseNpgsql(connectionString);
         });
+
+        services.AddScoped<IOrderingService, EfOrderingService>();
 
         return services;
     }
