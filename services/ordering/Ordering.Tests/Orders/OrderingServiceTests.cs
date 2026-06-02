@@ -383,6 +383,75 @@ public sealed class OrderingServiceTests
         Assert.Equal("order_cannot_be_cancelled", secondCancel.ErrorCode);
     }
 
+    [Fact]
+    public async Task MarkOrderPaidAsync_ShouldMarkPendingPaymentOrderAsPaidAndCommitReservation()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var result = await service.MarkOrderPaidAsync(createdOrder.Value!.Id);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("Paid", result.Value.Status);
+
+        Assert.Single(inventoryClient.CommitRequests);
+        Assert.Equal(
+            createdOrder.Value.Items[0].InventoryReservationId,
+            inventoryClient.CommitRequests[0]);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Paid", order.Status);
+    }
+
+    [Fact]
+    public async Task MarkOrderPaidAsync_ShouldRejectMissingOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+
+        var result = await service.MarkOrderPaidAsync(Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("order_not_found", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task MarkOrderPaidAsync_ShouldRejectCancelledOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var cancelResult = await service.CancelOrderAsync(createdOrder.Value!.Id);
+        var paidResult = await service.MarkOrderPaidAsync(createdOrder.Value.Id);
+
+        Assert.True(cancelResult.IsSuccess);
+        Assert.False(paidResult.IsSuccess);
+        Assert.Equal("order_cannot_be_marked_paid", paidResult.ErrorCode);
+    }
+
+    [Fact]
+    public async Task MarkOrderPaidAsync_ShouldRejectAlreadyPaidOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var firstResult = await service.MarkOrderPaidAsync(createdOrder.Value!.Id);
+        var secondResult = await service.MarkOrderPaidAsync(createdOrder.Value.Id);
+
+        Assert.True(firstResult.IsSuccess);
+        Assert.False(secondResult.IsSuccess);
+        Assert.Equal("order_cannot_be_marked_paid", secondResult.ErrorCode);
+    }
+
     private static EfOrderingService CreateService(
         OrderingDbContext dbContext,
         out FakeInventoryClient inventoryClient)
@@ -447,6 +516,8 @@ public sealed class OrderingServiceTests
 
         public List<Guid> ReleaseRequests { get; } = [];
 
+        public List<Guid> CommitRequests { get; } = [];
+
         public InventoryClientResult<InventoryReservationDto>? NextReserveResult { get; set; }
 
         public Task<InventoryClientResult<InventoryReservationDto>> ReserveStockAsync(
@@ -496,6 +567,28 @@ public sealed class OrderingServiceTests
                 CreatedAt: DateTimeOffset.UtcNow,
                 ReleasedAt: DateTimeOffset.UtcNow,
                 CommittedAt: null);
+
+            return Task.FromResult(
+                InventoryClientResult<InventoryReservationDto>.Success(reservation));
+        }
+
+        public Task<InventoryClientResult<InventoryReservationDto>> CommitReservationAsync(
+            Guid reservationId,
+            CancellationToken cancellationToken = default)
+        {
+            CommitRequests.Add(reservationId);
+
+            var reservation = new InventoryReservationDto(
+                Id: reservationId,
+                Sku: "ARM-BLK",
+                WarehouseId: WarehouseId,
+                LocationId: LocationId,
+                Quantity: 1,
+                Status: "Committed",
+                Reference: null,
+                CreatedAt: DateTimeOffset.UtcNow,
+                ReleasedAt: null,
+                CommittedAt: DateTimeOffset.UtcNow);
 
             return Task.FromResult(
                 InventoryClientResult<InventoryReservationDto>.Success(reservation));

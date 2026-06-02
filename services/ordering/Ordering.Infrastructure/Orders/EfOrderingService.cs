@@ -301,6 +301,55 @@ public sealed class EfOrderingService : IOrderingService
         return OrderingResult<OrderDetailsDto>.Success(ToDetailsDto(order));
     }
 
+    public async Task<OrderingResult<OrderDetailsDto>> MarkOrderPaidAsync(
+    Guid orderId,
+    CancellationToken cancellationToken = default)
+    {
+        var order = await _dbContext.Orders
+            .Include(order => order.Items)
+            .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
+
+        if (order is null)
+        {
+            return OrderingResult<OrderDetailsDto>.Failure(
+                "order_not_found",
+                "Order was not found.");
+        }
+
+        if (order.Status != OrderStatus.PendingPayment)
+        {
+            return OrderingResult<OrderDetailsDto>.Failure(
+                "order_cannot_be_marked_paid",
+                "Only pending payment orders can be marked as paid.");
+        }
+
+        foreach (var item in order.Items)
+        {
+            if (item.InventoryReservationId is null)
+            {
+                continue;
+            }
+
+            var commitResult = await _inventoryClient.CommitReservationAsync(
+                item.InventoryReservationId.Value,
+                cancellationToken);
+
+            if (!commitResult.IsSuccess)
+            {
+                return OrderingResult<OrderDetailsDto>.Failure(
+                    commitResult.ErrorCode ?? "inventory_reservation_commit_failed",
+                    commitResult.ErrorMessage ?? "Inventory reservation commit failed.");
+            }
+        }
+
+        order.Status = OrderStatus.Paid;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return OrderingResult<OrderDetailsDto>.Success(ToDetailsDto(order));
+    }
+
     private static OrderDetailsDto ToDetailsDto(Order order)
     {
         return new OrderDetailsDto(

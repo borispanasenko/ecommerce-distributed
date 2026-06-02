@@ -9,6 +9,10 @@ public interface IInventoryClient
     Task<InventoryClientResult<InventoryReservationDto>> ReleaseReservationAsync(
         Guid reservationId,
         CancellationToken cancellationToken = default);
+
+    Task<InventoryClientResult<InventoryReservationDto>> CommitReservationAsync(
+        Guid reservationId,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record ReserveStockRequest(
