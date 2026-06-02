@@ -7,8 +7,8 @@ Small distributed commerce system.
 ```text
 catalog   - products, brands, categories, variants/SKUs
 inventory - warehouses, locations, stock, reservations
-ordering  - orders, product snapshots and inventory reservatios
-payment   - payment simulation
+ordering  - orders, product snapshots and inventory reservations
+payment   - payment records and payment simulation
 frontend  - Angular UI
 ```
 
@@ -18,7 +18,7 @@ frontend  - Angular UI
 Catalog   - working backend flow, API, tests, documentation
 Inventory - working backend flow, API, tests, documentation
 Ordering  - working backend flow, Inventory integration, API, tests, documentation
-Payment   - scaffold
+Payment   - working backend flow, API, tests, documentation
 Frontend  - scaffold
 ```
 
@@ -112,6 +112,29 @@ POST /api/orders
 POST /api/orders/{id}/cancel
 ```
 
+## Payment flow
+
+```text
+Create payment for order
+List payments
+Get payment details
+Mark payment as succeeded
+Mark payment as failed
+Reject status changes after payment completion
+```
+
+## Payment API
+
+```text
+GET  /health
+
+GET  /api/payments
+GET  /api/payments/{id}
+POST /api/payments
+POST /api/payments/{id}/succeed
+POST /api/payments/{id}/fail
+```
+
 ## End-to-end flow
 
 ```text
@@ -120,6 +143,7 @@ Inventory stores stock by SKU.
 Ordering creates orders from product snapshot data.
 Ordering reserves Inventory stock when an order is created.
 Ordering releases Inventory reservation when an order is cancelled.
+Payment stores simulated payment records for orders.
 ```
 
 Current completed end-to-end scenario:
@@ -133,6 +157,8 @@ Order stores inventoryReservationId
 Order is cancelled
 Inventory reservation is released
 ```
+
+Payment is currently implemented as an independent service. It does not directly change orders or commit Inventory reservations yet.
 
 ## Local infrastructure
 
@@ -203,6 +229,14 @@ InventoryApi__BaseUrl="http://localhost:5245" \
 dotnet run --project services/ordering/Ordering.Api/Ordering.Api.csproj
 ```
 
+## Run Payment API locally
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development \
+ConnectionStrings__DefaultConnection="Host=localhost;Port=5436;Database=payment_db;Username=postgres;Password=postgres" \
+dotnet run --project services/payment/Payment.Api/Payment.Api.csproj
+```
+
 ## Tests
 
 Catalog:
@@ -221,6 +255,12 @@ Ordering:
 
 ```bash
 dotnet test services/ordering/Ordering.sln
+```
+
+Payment:
+
+```bash
+dotnet test services/payment/Payment.sln
 ```
 
 ## Manual API checks
@@ -246,6 +286,13 @@ services/ordering/Ordering.Api/Ordering.Api.http
 services/ordering/Ordering.Api/Ordering.Api.readonly.http
 ```
 
+Payment:
+
+```text
+services/payment/Payment.Api/Payment.Api.http
+services/payment/Payment.Api/Payment.Api.readonly.http
+```
+
 Files ending with `.readonly.http` contain only safe read-only requests.
 
 ## Documentation
@@ -254,6 +301,7 @@ Files ending with `.readonly.http` contain only safe read-only requests.
 docs/catalog-db.md
 docs/inventory-db.md
 docs/ordering-db.md
+docs/payment-db.md
 docs/architecture.md
 docs/local-development.md
 docs/messages.md
@@ -292,6 +340,15 @@ order totals
 product snapshots inside orders
 ```
 
+Payment owns:
+
+```text
+payments
+payment statuses
+payment provider references
+payment failure reasons
+```
+
 ## Boundary rules
 
 Catalog does not store stock.
@@ -311,3 +368,11 @@ Ordering may reference Inventory reservations by `inventory_reservation_id`.
 Ordering creates Inventory reservations when orders are created.
 
 Ordering releases Inventory reservations when orders are cancelled.
+
+Payment does not store order details.
+
+Payment references orders by `order_id`.
+
+Payment does not directly change orders yet.
+
+Payment does not commit Inventory reservations yet.
