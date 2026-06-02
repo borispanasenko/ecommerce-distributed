@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Payment.Infrastructure.Persistence;
+using Payment.Application.Payments;
+using Payment.Infrastructure.Payments;
 
 namespace Payment.Infrastructure;
 
@@ -23,6 +25,8 @@ public static class DependencyInjection
         {
             options.UseNpgsql(connectionString);
         });
+
+        services.AddScoped<IPaymentService, EfPaymentService>();
 
         return services;
     }

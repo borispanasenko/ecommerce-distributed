@@ -1,4 +1,5 @@
 using Payment.Infrastructure;
+using Payment.Api.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,5 +28,7 @@ app.MapGet("/health", () => Results.Ok(new
 }))
 .WithName("HealthCheck")
 .WithOpenApi();
+
+app.MapPaymentEndpoints();
 
 app.Run();
