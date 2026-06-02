@@ -1,7 +1,10 @@
 ### WARNING
 ### This file changes local development data.
+### Requests are additive and may create orders, reservations and stock movements.
+### Flows are designed to finish in terminal states and avoid active dangling reservations.
 ### Creating an order reserves Inventory stock.
 ### Cancelling an order releases Inventory reservation.
+### Marking an order as paid commits Inventory reservation.
 ### Inventory API must be running and configured through InventoryApi:BaseUrl.
 ### Change runId before running the full flow again.
 
@@ -13,11 +16,12 @@
 @locationId = 38a754af-e46e-4d4e-a014-a8dc68cda9fa
 @sku = ARM-BLK
 
+
 ### Health check
 GET {{OrderingApi_HostAddress}}/health
 
 
-### Check Inventory stock before order
+### Check Inventory stock before flow
 GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 
@@ -25,14 +29,14 @@ GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 GET {{OrderingApi_HostAddress}}/api/orders
 
 
-### Create order and reserve Inventory stock
-# @name createOrder
+### Create order for cancel flow
+# @name createOrderForCancel
 POST {{OrderingApi_HostAddress}}/api/orders
 Content-Type: application/json
 
 {
-  "customerName": "Test Customer {{runId}}",
-  "customerEmail": "test-{{runId}}@example.com",
+  "customerName": "Cancel Flow Customer {{runId}}",
+  "customerEmail": "cancel-flow-{{runId}}@example.com",
   "items": [
     {
       "productId": "a301a968-7477-4db5-bafd-edfb3bd03675",
@@ -50,25 +54,72 @@ Content-Type: application/json
 }
 
 
-### Get created order details
-@orderId = {{createOrder.response.body.$.id}}
+### Get cancel-flow order details
+@orderToCancelId = {{createOrderForCancel.response.body.$.id}}
 
-GET {{OrderingApi_HostAddress}}/api/orders/{{orderId}}
+GET {{OrderingApi_HostAddress}}/api/orders/{{orderToCancelId}}
 
 
-### Check Inventory stock after order reservation
+### Check Inventory stock after cancel-flow reservation
 GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 
 ### Cancel order and release Inventory reservation
-POST {{OrderingApi_HostAddress}}/api/orders/{{orderId}}/cancel
+POST {{OrderingApi_HostAddress}}/api/orders/{{orderToCancelId}}/cancel
 
 
 ### Get order details after cancel
-GET {{OrderingApi_HostAddress}}/api/orders/{{orderId}}
+GET {{OrderingApi_HostAddress}}/api/orders/{{orderToCancelId}}
 
 
 ### Check Inventory stock after cancel
+GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
+
+
+### Create order for direct mark-paid flow
+# @name createOrderForPaid
+POST {{OrderingApi_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Paid Flow Customer {{runId}}",
+  "customerEmail": "paid-flow-{{runId}}@example.com",
+  "items": [
+    {
+      "productId": "a301a968-7477-4db5-bafd-edfb3bd03675",
+      "productVariantId": "9572fb9d-f059-401e-9041-7fc75f8cb414",
+      "sku": "{{sku}}",
+      "productName": "Monitor Arm",
+      "variantName": "Black",
+      "unitPriceAmountMinor": 6900,
+      "currency": "USD",
+      "quantity": 2,
+      "warehouseId": "{{warehouseId}}",
+      "locationId": "{{locationId}}"
+    }
+  ]
+}
+
+
+### Get paid-flow order details
+@orderToMarkPaidId = {{createOrderForPaid.response.body.$.id}}
+
+GET {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}
+
+
+### Check Inventory stock after paid-flow reservation
+GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
+
+
+### Mark order as paid and commit Inventory reservation
+POST {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}/mark-paid
+
+
+### Get order details after mark-paid
+GET {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}
+
+
+### Check Inventory stock after mark-paid
 GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 
