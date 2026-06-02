@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Payment.Infrastructure.Persistence;
 using Payment.Application.Payments;
 using Payment.Infrastructure.Payments;
+using Payment.Application.Ordering;
+using Payment.Infrastructure.Ordering;
 
 namespace Payment.Infrastructure;
 
@@ -27,6 +29,19 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IPaymentService, EfPaymentService>();
+
+        var orderingApiBaseUrl = configuration["OrderingApi:BaseUrl"];
+
+        if (string.IsNullOrWhiteSpace(orderingApiBaseUrl))
+        {
+            throw new InvalidOperationException(
+                "Ordering API base URL 'OrderingApi:BaseUrl' is not configured.");
+        }
+
+        services.AddHttpClient<IOrderingClient, HttpOrderingClient>(client =>
+        {
+            client.BaseAddress = new Uri(orderingApiBaseUrl);
+        });
 
         return services;
     }

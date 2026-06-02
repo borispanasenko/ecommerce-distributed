@@ -2,16 +2,22 @@ using Microsoft.EntityFrameworkCore;
 using Payment.Application.Payments;
 using Payment.Domain.Payments;
 using Payment.Infrastructure.Persistence;
+using Payment.Application.Ordering;
+
 
 namespace Payment.Infrastructure.Payments;
 
 public sealed class EfPaymentService : IPaymentService
 {
     private readonly PaymentDbContext _dbContext;
+    private readonly IOrderingClient _orderingClient;
 
-    public EfPaymentService(PaymentDbContext dbContext)
+    public EfPaymentService(
+        PaymentDbContext dbContext,
+        IOrderingClient orderingClient)
     {
         _dbContext = dbContext;
+        _orderingClient = orderingClient;
     }
 
     public async Task<PaymentResult<PaymentDetailsDto>> CreatePaymentAsync(
@@ -118,6 +124,17 @@ public sealed class EfPaymentService : IPaymentService
             return PaymentResult<PaymentDetailsDto>.Failure(
                 "payment_not_pending",
                 "Only pending payment can be marked as succeeded.");
+        }
+
+        var markOrderPaidResult = await _orderingClient.MarkOrderPaidAsync(
+            payment.OrderId,
+            cancellationToken);
+
+        if (!markOrderPaidResult.IsSuccess)
+        {
+            return PaymentResult<PaymentDetailsDto>.Failure(
+                markOrderPaidResult.ErrorCode ?? "ordering_mark_paid_failed",
+                markOrderPaidResult.ErrorMessage ?? "Ordering mark-paid request failed.");
         }
 
         var now = DateTimeOffset.UtcNow;

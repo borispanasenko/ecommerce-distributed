@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Payment.Application.Payments;
 using Payment.Infrastructure.Payments;
 using Payment.Infrastructure.Persistence;
+using Payment.Application.Ordering;
 
 namespace Payment.Tests.Payments;
 
@@ -11,7 +12,7 @@ public sealed class PaymentServiceTests
     public async Task CreatePaymentAsync_ShouldCreatePendingPayment()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var result = await service.CreatePaymentAsync(CreateValidPaymentRequest());
 
@@ -34,7 +35,7 @@ public sealed class PaymentServiceTests
     public async Task CreatePaymentAsync_ShouldNormalizeCurrencyAndProvider()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var result = await service.CreatePaymentAsync(new CreatePaymentRequest(
             OrderId: Guid.NewGuid(),
@@ -52,7 +53,7 @@ public sealed class PaymentServiceTests
     public async Task CreatePaymentAsync_ShouldRejectMissingOrderId()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var request = CreateValidPaymentRequest() with
         {
@@ -69,7 +70,7 @@ public sealed class PaymentServiceTests
     public async Task CreatePaymentAsync_ShouldRejectInvalidAmount()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var request = CreateValidPaymentRequest() with
         {
@@ -86,7 +87,7 @@ public sealed class PaymentServiceTests
     public async Task CreatePaymentAsync_ShouldRejectInvalidCurrency()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var request = CreateValidPaymentRequest() with
         {
@@ -103,7 +104,7 @@ public sealed class PaymentServiceTests
     public async Task CreatePaymentAsync_ShouldRejectMissingProvider()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var request = CreateValidPaymentRequest() with
         {
@@ -120,7 +121,7 @@ public sealed class PaymentServiceTests
     public async Task GetPaymentsAsync_ShouldReturnPayments()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var createdPayment = await service.CreatePaymentAsync(CreateValidPaymentRequest());
 
@@ -137,7 +138,7 @@ public sealed class PaymentServiceTests
     public async Task GetPaymentByIdAsync_ShouldReturnPaymentDetails()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var createdPayment = await service.CreatePaymentAsync(CreateValidPaymentRequest());
 
@@ -153,7 +154,7 @@ public sealed class PaymentServiceTests
     public async Task GetPaymentByIdAsync_ShouldReturnNull_WhenPaymentDoesNotExist()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var payment = await service.GetPaymentByIdAsync(Guid.NewGuid());
 
@@ -164,7 +165,7 @@ public sealed class PaymentServiceTests
     public async Task MarkPaymentSucceededAsync_ShouldMarkPendingPaymentAsSucceeded()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var createdPayment = await service.CreatePaymentAsync(CreateValidPaymentRequest());
 
@@ -184,7 +185,7 @@ public sealed class PaymentServiceTests
     public async Task MarkPaymentSucceededAsync_ShouldRejectMissingPayment()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var result = await service.MarkPaymentSucceededAsync(
             Guid.NewGuid(),
@@ -198,7 +199,7 @@ public sealed class PaymentServiceTests
     public async Task MarkPaymentSucceededAsync_ShouldRejectAlreadySucceededPayment()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var createdPayment = await service.CreatePaymentAsync(CreateValidPaymentRequest());
 
@@ -219,7 +220,7 @@ public sealed class PaymentServiceTests
     public async Task MarkPaymentFailedAsync_ShouldMarkPendingPaymentAsFailed()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var createdPayment = await service.CreatePaymentAsync(CreateValidPaymentRequest());
 
@@ -239,7 +240,7 @@ public sealed class PaymentServiceTests
     public async Task MarkPaymentFailedAsync_ShouldRejectMissingPayment()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var result = await service.MarkPaymentFailedAsync(
             Guid.NewGuid(),
@@ -253,7 +254,7 @@ public sealed class PaymentServiceTests
     public async Task MarkPaymentFailedAsync_ShouldRejectSucceededPayment()
     {
         await using var dbContext = CreateDbContext();
-        var service = new EfPaymentService(dbContext);
+        var service = CreateService(dbContext, out _);
 
         var createdPayment = await service.CreatePaymentAsync(CreateValidPaymentRequest());
 
@@ -268,6 +269,49 @@ public sealed class PaymentServiceTests
         Assert.True(succeededResult.IsSuccess);
         Assert.False(failedResult.IsSuccess);
         Assert.Equal("payment_not_pending", failedResult.ErrorCode);
+    }
+
+    [Fact]
+    public async Task MarkPaymentSucceededAsync_ShouldCallOrderingMarkPaid()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var orderingClient);
+
+        var createdPayment = await service.CreatePaymentAsync(CreateValidPaymentRequest());
+
+        var result = await service.MarkPaymentSucceededAsync(
+            createdPayment.Value!.Id,
+            new CompletePaymentRequest("MANUAL-APPROVED-001"));
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(orderingClient.MarkPaidRequests);
+        Assert.Equal(createdPayment.Value.OrderId, orderingClient.MarkPaidRequests[0]);
+    }
+
+    [Fact]
+    public async Task MarkPaymentSucceededAsync_ShouldRejectPayment_WhenOrderingMarkPaidFails()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var orderingClient);
+
+        orderingClient.NextMarkPaidResult =
+            OrderingClientResult<OrderDetailsDto>.Failure(
+                "order_cannot_be_marked_paid",
+                "Only pending payment orders can be marked as paid.");
+
+        var createdPayment = await service.CreatePaymentAsync(CreateValidPaymentRequest());
+
+        var result = await service.MarkPaymentSucceededAsync(
+            createdPayment.Value!.Id,
+            new CompletePaymentRequest("MANUAL-APPROVED-001"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("order_cannot_be_marked_paid", result.ErrorCode);
+
+        var payment = await service.GetPaymentByIdAsync(createdPayment.Value.Id);
+
+        Assert.NotNull(payment);
+        Assert.Equal("Pending", payment.Status);
     }
 
     private static CreatePaymentRequest CreateValidPaymentRequest()
@@ -286,5 +330,50 @@ public sealed class PaymentServiceTests
             .Options;
 
         return new PaymentDbContext(options);
+    }
+
+    private static EfPaymentService CreateService(
+        PaymentDbContext dbContext,
+        out FakeOrderingClient orderingClient)
+    {
+        orderingClient = new FakeOrderingClient();
+
+        return new EfPaymentService(dbContext, orderingClient);
+    }
+
+    private sealed class FakeOrderingClient : IOrderingClient
+    {
+        public List<Guid> MarkPaidRequests { get; } = [];
+
+        public OrderingClientResult<OrderDetailsDto>? NextMarkPaidResult { get; set; }
+
+        public Task<OrderingClientResult<OrderDetailsDto>> MarkOrderPaidAsync(
+            Guid orderId,
+            CancellationToken cancellationToken = default)
+        {
+            MarkPaidRequests.Add(orderId);
+
+            if (NextMarkPaidResult is not null)
+            {
+                var result = NextMarkPaidResult;
+                NextMarkPaidResult = null;
+
+                return Task.FromResult(result);
+            }
+
+            var order = new OrderDetailsDto(
+                Id: orderId,
+                CustomerName: "Test Customer",
+                CustomerEmail: "test@example.com",
+                Status: "Paid",
+                TotalAmountMinor: 13800,
+                Currency: "USD",
+                CreatedAt: DateTimeOffset.UtcNow,
+                UpdatedAt: DateTimeOffset.UtcNow,
+                Items: []);
+
+            return Task.FromResult(
+                OrderingClientResult<OrderDetailsDto>.Success(order));
+        }
     }
 }
