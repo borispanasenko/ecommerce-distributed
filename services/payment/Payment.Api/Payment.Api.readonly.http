@@ -1,0 +1,19 @@
+@PaymentApi_HostAddress = http://localhost:5206
+
+### Health check
+GET {{PaymentApi_HostAddress}}/health
+
+
+### List payments
+GET {{PaymentApi_HostAddress}}/api/payments
+
+
+### Get known payment details
+### Replace paymentId with an existing payment id from GET /api/payments.
+@paymentId = PUT_PAYMENT_ID_HERE
+
+GET {{PaymentApi_HostAddress}}/api/payments/{{paymentId}}
+
+
+### Missing payment should return 404
+GET {{PaymentApi_HostAddress}}/api/payments/00000000-0000-0000-0000-000000000000

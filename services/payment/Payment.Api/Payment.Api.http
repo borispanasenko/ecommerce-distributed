@@ -1,6 +1,149 @@
-@Payment.Api_HostAddress = http://localhost:5206
+### WARNING
+### This file changes local development data.
+### Creating payments adds records.
+### Succeed/fail requests change payment status.
+### Change runId before running the full flow again.
 
-GET {{Payment.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+@PaymentApi_HostAddress = http://localhost:5206
+@runId = 001
 
-###
+### Use an existing order id from Ordering.
+@orderId = 9363be3c-a960-480b-a8ef-b91fd9bfc8b6
+
+
+### Health check
+GET {{PaymentApi_HostAddress}}/health
+
+
+### List payments
+GET {{PaymentApi_HostAddress}}/api/payments
+
+
+### Create payment for succeed flow
+# @name createPayment
+POST {{PaymentApi_HostAddress}}/api/payments
+Content-Type: application/json
+
+{
+  "orderId": "{{orderId}}",
+  "amountMinor": 13800,
+  "currency": "USD",
+  "provider": "Manual"
+}
+
+
+### Get created payment details
+@paymentId = {{createPayment.response.body.$.id}}
+
+GET {{PaymentApi_HostAddress}}/api/payments/{{paymentId}}
+
+
+### Mark payment as succeeded
+POST {{PaymentApi_HostAddress}}/api/payments/{{paymentId}}/succeed
+Content-Type: application/json
+
+{
+  "providerReference": "MANUAL-APPROVED-{{runId}}"
+}
+
+
+### Get payment details after succeed
+GET {{PaymentApi_HostAddress}}/api/payments/{{paymentId}}
+
+
+### Mark already succeeded payment as succeeded again should return 400
+POST {{PaymentApi_HostAddress}}/api/payments/{{paymentId}}/succeed
+Content-Type: application/json
+
+{
+  "providerReference": "MANUAL-APPROVED-RETRY-{{runId}}"
+}
+
+
+### Create payment for failed flow
+# @name createPaymentForFail
+POST {{PaymentApi_HostAddress}}/api/payments
+Content-Type: application/json
+
+{
+  "orderId": "{{orderId}}",
+  "amountMinor": 13800,
+  "currency": "USD",
+  "provider": "Manual"
+}
+
+
+### Mark payment as failed
+@paymentToFailId = {{createPaymentForFail.response.body.$.id}}
+
+POST {{PaymentApi_HostAddress}}/api/payments/{{paymentToFailId}}/fail
+Content-Type: application/json
+
+{
+  "failureReason": "Manual failure {{runId}}"
+}
+
+
+### Get payment details after fail
+GET {{PaymentApi_HostAddress}}/api/payments/{{paymentToFailId}}
+
+
+### Mark already failed payment as succeeded should return 400
+POST {{PaymentApi_HostAddress}}/api/payments/{{paymentToFailId}}/succeed
+Content-Type: application/json
+
+{
+  "providerReference": "MANUAL-APPROVED-AFTER-FAIL-{{runId}}"
+}
+
+
+### Create invalid payment without order id should return 400
+POST {{PaymentApi_HostAddress}}/api/payments
+Content-Type: application/json
+
+{
+  "orderId": "00000000-0000-0000-0000-000000000000",
+  "amountMinor": 13800,
+  "currency": "USD",
+  "provider": "Manual"
+}
+
+
+### Create invalid payment with zero amount should return 400
+POST {{PaymentApi_HostAddress}}/api/payments
+Content-Type: application/json
+
+{
+  "orderId": "{{orderId}}",
+  "amountMinor": 0,
+  "currency": "USD",
+  "provider": "Manual"
+}
+
+
+### Create invalid payment with invalid currency should return 400
+POST {{PaymentApi_HostAddress}}/api/payments
+Content-Type: application/json
+
+{
+  "orderId": "{{orderId}}",
+  "amountMinor": 13800,
+  "currency": "US",
+  "provider": "Manual"
+}
+
+
+### Create invalid payment without provider should return 400
+POST {{PaymentApi_HostAddress}}/api/payments
+Content-Type: application/json
+
+{
+  "orderId": "{{orderId}}",
+  "amountMinor": 13800,
+  "currency": "USD",
+  "provider": " "
+}
+
+
+### Missing payment should return 404
+GET {{PaymentApi_HostAddress}}/api/payments/00000000-0000-0000-0000-000000000000
