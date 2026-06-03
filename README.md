@@ -18,7 +18,7 @@ frontend  - Angular UI
 Catalog   - working backend flow, API, tests, documentation
 Inventory - working backend flow, API, tests, documentation
 Ordering  - working backend flow, Inventory integration, API, tests, documentation
-Payment   - working backend flow, API, tests, documentation
+Payment   - working backend flow, Ordering integration, API, tests, documentation
 Frontend  - scaffold
 ```
 
@@ -99,6 +99,8 @@ List orders
 Get order details
 Cancel order
 Release Inventory reservation
+Mark order as Paid
+Commit Inventory reservation
 ```
 
 ## Ordering API
@@ -110,6 +112,7 @@ GET  /api/orders
 GET  /api/orders/{id}
 POST /api/orders
 POST /api/orders/{id}/cancel
+POST /api/orders/{id}/mark-paid
 ```
 
 ## Payment flow
@@ -119,6 +122,8 @@ Create payment for order
 List payments
 Get payment details
 Mark payment as succeeded
+Mark linked order as Paid through Ordering
+Commit Inventory reservation through Ordering
 Mark payment as failed
 Reject status changes after payment completion
 ```
@@ -135,7 +140,7 @@ POST /api/payments/{id}/succeed
 POST /api/payments/{id}/fail
 ```
 
-## End-to-end flow
+## End-to-end flows
 
 ```text
 Catalog defines product variants and SKUs.
@@ -144,11 +149,15 @@ Ordering creates orders from product snapshot data.
 Ordering reserves Inventory stock when an order is created.
 Ordering releases Inventory reservation when an order is cancelled.
 Payment stores simulated payment records for orders.
+Payment calls Ordering when a pending payment succeeds.
+Ordering marks the order as Paid.
+Ordering commits Inventory reservation when order is marked as Paid.
 ```
 
-Current completed end-to-end scenario:
+Completed scenarios:
 
 ```text
+Cancel flow:
 Product exists in Catalog
 Stock exists in Inventory
 Order is created in Ordering
@@ -158,7 +167,29 @@ Order is cancelled
 Inventory reservation is released
 ```
 
-Payment is currently implemented as an independent service. It does not directly change orders or commit Inventory reservations yet.
+```text
+Payment success flow:
+Product exists in Catalog
+Stock exists in Inventory
+Order is created in Ordering
+Inventory stock is reserved
+Order stores inventoryReservationId
+Payment is created for the order
+Payment is marked as Succeeded
+Payment calls Ordering to mark the order as Paid
+Order is marked as Paid
+Ordering commits Inventory reservation
+Inventory on-hand stock is decreased
+```
+
+```text
+Payment failure flow:
+Payment is created
+Payment is marked as Failed
+Payment remains terminal Failed
+Payment failure does not call Ordering
+No Inventory reservation is committed by Payment failure
+```
 
 ## Local infrastructure
 
@@ -231,9 +262,16 @@ dotnet run --project services/ordering/Ordering.Api/Ordering.Api.csproj
 
 ## Run Payment API locally
 
+Payment API requires Ordering API for successful payment flow.
+
+Run Inventory API and Ordering API first.
+
+Then run Payment API:
+
 ```bash
 ASPNETCORE_ENVIRONMENT=Development \
 ConnectionStrings__DefaultConnection="Host=localhost;Port=5436;Database=payment_db;Username=postgres;Password=postgres" \
+OrderingApi__BaseUrl="http://localhost:5172" \
 dotnet run --project services/payment/Payment.Api/Payment.Api.csproj
 ```
 
@@ -294,6 +332,8 @@ services/payment/Payment.Api/Payment.Api.readonly.http
 ```
 
 Files ending with `.readonly.http` contain only safe read-only requests.
+
+Write `.http` files may change local development data, but flows are designed to finish in terminal states and avoid active dangling reservations.
 
 ## Documentation
 
@@ -369,10 +409,14 @@ Ordering creates Inventory reservations when orders are created.
 
 Ordering releases Inventory reservations when orders are cancelled.
 
+Ordering commits Inventory reservations when orders are marked as Paid.
+
 Payment does not store order details.
 
 Payment references orders by `order_id`.
 
-Payment does not directly change orders yet.
+Payment calls Ordering when a pending payment succeeds.
 
-Payment does not commit Inventory reservations yet.
+Payment does not write OrderingDb directly.
+
+Payment does not write InventoryDb directly.

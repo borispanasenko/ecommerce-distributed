@@ -36,9 +36,12 @@ Other services may reference payment data by `payment_id`, but they must not rea
 3. Payments reference orders by `order_id`.
 4. Payment amounts are stored in minor units to avoid decimal precision issues.
 5. Payment provider details are stored as simple provider metadata.
-6. Tables use UUID primary keys.
-7. Payments have `created_at` and `updated_at`.
-8. Terminal payment statuses cannot be changed back to `Pending`.
+6. Payment Service calls Ordering Service when a pending payment succeeds.
+7. Payment Service does not write `OrderingDb` directly.
+8. Payment Service does not write `InventoryDb` directly.
+9. Tables use UUID primary keys.
+10. Payments have `created_at` and `updated_at`.
+11. Terminal payment statuses cannot be changed back to `Pending`.
 
 ---
 
@@ -89,6 +92,7 @@ Notes:
 * `provider` can be `Manual` for local development.
 * `provider_reference` stores an external or simulated payment reference.
 * `failure_reason` stores a short reason for failed payments.
+* When a pending payment succeeds, Payment Service calls Ordering Service to mark the linked order as `Paid`.
 
 Rules:
 
@@ -99,6 +103,8 @@ Rules:
 * Only `Pending` payments can be marked as `Succeeded`.
 * Only `Pending` payments can be marked as `Failed`.
 * `Succeeded` and `Failed` payments cannot be changed again.
+* Failed payments do not call Ordering.
+* Failed payments do not commit Inventory reservations.
 
 ---
 
@@ -173,6 +179,7 @@ Create payment
 List payments
 Get payment details
 Mark payment as succeeded
+Call Ordering to mark order as Paid
 Mark payment as failed
 ```
 
@@ -183,6 +190,11 @@ Payments are created as Pending.
 Payments can be marked as Succeeded.
 Payments can be marked as Failed.
 Only Pending payments can be completed.
+When a pending payment succeeds, Payment Service calls Ordering Service to mark the linked order as Paid.
+Ordering commits Inventory reservation after order is marked as Paid.
+If Ordering mark-paid request fails, payment remains Pending.
+Failed payments do not call Ordering.
+Failed payments do not commit Inventory reservations.
 Succeeded payments cannot be failed.
 Failed payments cannot be succeeded.
 Payments with empty order_id are rejected.
@@ -201,17 +213,18 @@ Payment validation tests
 Payment list tests
 Payment details tests
 Payment succeed tests
+Ordering integration tests
 Payment fail tests
+Payment status transition tests
 Missing payment tests
 ```
 
 Future work:
 
 ```text
-Connect Payment Service to Ordering.
-Mark order as Paid after successful payment.
-Commit Inventory reservation after successful payment.
-Handle payment failure in Ordering.
+Handle payment failure effects on order lifecycle.
 Add payment cancellation.
 Add refund flow.
+Add payment webhooks.
+Add retry handling for failed cross-service calls.
 ```

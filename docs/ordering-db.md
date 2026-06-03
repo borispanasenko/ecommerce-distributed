@@ -27,6 +27,8 @@ Catalog Service owns product data.
 
 Inventory Service owns stock and reservations.
 
+Payment Service owns payments.
+
 Ordering Service stores product snapshots so existing orders do not change when Catalog data changes.
 
 Other services may reference ordering data by `order_id`, but they must not read or write `OrderingDb` directly.
@@ -38,12 +40,13 @@ Other services may reference ordering data by `order_id`, but they must not read
 1. Ordering owns the order lifecycle.
 2. Catalog owns product descriptions, variants and current prices.
 3. Inventory owns stock and reservations.
-4. Order items store product snapshots.
-5. Orders store totals in minor units to avoid decimal precision issues.
-6. One order can contain multiple order items.
-7. All order items in one order use the same currency.
-8. Tables use UUID primary keys.
-9. Orders have `created_at` and `updated_at`.
+4. Payment owns payment state.
+5. Order items store product snapshots.
+6. Orders store totals in minor units to avoid decimal precision issues.
+7. One order can contain multiple order items.
+8. All order items in one order use the same currency.
+9. Tables use UUID primary keys.
+10. Orders have `created_at` and `updated_at`.
 
 ---
 
@@ -78,6 +81,7 @@ Current implemented statuses:
 
 ```text
 PendingPayment
+Paid
 Cancelled
 ```
 
@@ -85,6 +89,7 @@ Notes:
 
 * Orders are currently created as `PendingPayment`.
 * Orders can be cancelled while they are in `PendingPayment`.
+* Orders can be marked as `Paid` while they are in `PendingPayment`.
 * `total_amount_minor` stores money in minor units.
 * Example: `13800` means `138.00`.
 
@@ -92,6 +97,7 @@ Rules:
 
 * Order must contain at least one item.
 * Only `PendingPayment` orders can be cancelled.
+* Only `PendingPayment` orders can be marked as `Paid`.
 * `total_amount_minor` must be greater than or equal to `0`.
 * `currency` must have `3` characters.
 * All order items must use the same currency.
@@ -207,7 +213,7 @@ length(order_items.currency) = 3
 
 The following are intentionally excluded:
 
-* payment processing;
+* payment state storage;
 * refunds;
 * invoices;
 * shipment tracking;
@@ -218,7 +224,8 @@ The following are intentionally excluded:
 * order returns;
 * order event log;
 * direct reads from CatalogDb;
-* direct reads from InventoryDb.
+* direct reads from InventoryDb;
+* direct reads from PaymentDb.
 
 These may be added later only if there is a clear business reason.
 
@@ -233,6 +240,7 @@ GET  /api/orders
 GET  /api/orders/{id}
 POST /api/orders
 POST /api/orders/{id}/cancel
+POST /api/orders/{id}/mark-paid
 ```
 
 Current ordering flow:
@@ -245,6 +253,8 @@ List orders
 Get order details
 Cancel order
 Release Inventory reservation
+Mark order as Paid
+Commit Inventory reservation
 ```
 
 Current behavior:
@@ -264,6 +274,11 @@ If order persistence fails after reservation, Ordering tries to release created 
 Only PendingPayment orders can be cancelled.
 Cancelling an order releases Inventory reservations.
 Cancelled orders cannot be cancelled again.
+Only PendingPayment orders can be marked as Paid.
+Marking an order as Paid commits Inventory reservations.
+Paid orders cannot be cancelled.
+Paid orders cannot be marked as Paid again.
+Payment Service calls Ordering to mark orders as Paid when a pending payment succeeds.
 GET /api/orders returns order summaries.
 GET /api/orders/{id} returns order details.
 ```
@@ -278,15 +293,16 @@ Validation tests
 Order list tests
 Order details tests
 Cancel order tests
+Mark paid tests
+Inventory reservation commit tests
 Missing order tests
 ```
 
 Future work:
 
 ```text
-Connect Payment service.
-Mark order as Paid after successful payment.
-Commit Inventory reservation after payment or shipment.
-Handle payment failure.
+Handle payment failure effects on order lifecycle.
 Add order event history.
+Add shipment flow.
+Add refund flow.
 ```
