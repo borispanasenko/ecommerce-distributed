@@ -11,6 +11,6 @@ export class CatalogApi {
   private readonly http = inject(HttpClient);
 
   getProducts(): Observable<CatalogProduct[]> {
-    return this.http.get<CatalogProduct[]>('http://localhost:5001/products');
+    return this.http.get<CatalogProduct[]>('http://localhost:5001/api/products');
   }
 }
