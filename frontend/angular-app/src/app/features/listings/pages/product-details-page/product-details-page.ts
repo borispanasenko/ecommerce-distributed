@@ -3,7 +3,8 @@ import { Component, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map, switchMap } from 'rxjs';
 
-import { CatalogProductDetails } from '../../models/catalog-product';
+import { CartStore } from '../../../cart/services/cart-store';
+import { CatalogProductDetails, CatalogProductVariant } from '../../models/catalog-product';
 import { CatalogApi } from '../../services/catalog-api';
 
 @Component({
@@ -16,6 +17,8 @@ import { CatalogApi } from '../../services/catalog-api';
 export class ProductDetailsPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly catalogApi = inject(CatalogApi);
+
+  protected readonly cartStore = inject(CartStore);
 
   protected readonly product$ = this.route.paramMap.pipe(
     map((params) => params.get('id')),
@@ -30,6 +33,18 @@ export class ProductDetailsPageComponent {
 
   protected getPrimaryImage(product: CatalogProductDetails): string | null {
     return product.images.find((image) => image.isPrimary)?.url ?? product.images[0]?.url ?? null;
+  }
+
+  protected addVariantToCart(product: CatalogProductDetails, variant: CatalogProductVariant): void {
+    this.cartStore.addItem({
+      productId: product.id,
+      productVariantId: variant.id,
+      sku: variant.sku,
+      productName: product.name,
+      variantName: variant.name,
+      unitPriceAmountMinor: variant.priceAmountMinor,
+      currency: variant.currency,
+    });
   }
 
   protected formatPrice(priceAmountMinor: number, currency: string): string {

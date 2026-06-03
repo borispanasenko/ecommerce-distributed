@@ -5,6 +5,8 @@
       <h1>Products</h1>
       <p class="subtitle">Products loaded from the Catalog service.</p>
     </div>
+
+    <a routerLink="/cart" class="button">Cart ({{ cartStore.totalQuantity() }})</a>
   </header>
 
   @if (products$ | async; as products) {
@@ -36,7 +38,14 @@
 
           <div class="actions">
             <a [routerLink]="['/listings', product.id]" class="button">View details</a>
-            <button type="button" class="primary">Add to cart</button>
+            <button
+              type="button"
+              class="primary"
+              [disabled]="!getFirstActiveVariant(product)"
+              (click)="addFirstVariantToCart(product)"
+            >
+              Add to cart
+            </button>
           </div>
         </article>
       }

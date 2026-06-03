@@ -1,0 +1,60 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Cart</p>
+      <h1>Your cart</h1>
+      <p class="subtitle">Client-side cart. Checkout will create an order later.</p>
+    </div>
+
+    <a routerLink="/listings" class="button">Continue shopping</a>
+  </header>
+
+  @if (cartStore.items().length > 0) {
+    <div class="cart">
+      @for (item of cartStore.items(); track item.productVariantId) {
+        <article class="cart-item">
+          <div>
+            <h2>{{ item.productName }}</h2>
+            <p class="muted">{{ item.variantName }} · SKU: {{ item.sku }}</p>
+            <p class="price">
+              {{ formatPrice(item.unitPriceAmountMinor, item.currency) }}
+            </p>
+          </div>
+
+          <div class="quantity">
+            <button type="button" (click)="cartStore.decrementItem(item.productVariantId)">−</button>
+            <span>{{ item.quantity }}</span>
+            <button type="button" (click)="cartStore.incrementItem(item.productVariantId)">+</button>
+          </div>
+
+          <div class="line-total">
+            {{ formatPrice(getLineTotalAmountMinor(item.unitPriceAmountMinor, item.quantity), item.currency) }}
+          </div>
+
+          <button type="button" class="danger" (click)="cartStore.removeItem(item.productVariantId)">
+            Remove
+          </button>
+        </article>
+      }
+
+      <footer class="summary">
+        <div>
+          <span class="muted">Items</span>
+          <strong>{{ cartStore.totalQuantity() }}</strong>
+        </div>
+
+        <div>
+          <span class="muted">Total</span>
+          <strong>{{ formatPrice(getCartTotalAmountMinor(), getCartCurrency()) }}</strong>
+        </div>
+
+        <button type="button" class="primary">Checkout</button>
+      </footer>
+    </div>
+  } @else {
+    <div class="empty">
+      <p>Your cart is empty.</p>
+      <a routerLink="/listings" class="button primary">Browse products</a>
+    </div>
+  }
+</section>

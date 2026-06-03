@@ -3,6 +3,10 @@
 }
 
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
   margin-bottom: 24px;
 }
 
@@ -84,9 +88,20 @@ button.primary {
   border-color: #111;
 }
 
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .variants {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 12px;
+}
+
+@media (max-width: 760px) {
+  .page-header {
+    display: grid;
+  }
 }
