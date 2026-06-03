@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { CatalogProduct } from '../../models/catalog-product';
 import { CatalogApi } from '../../services/catalog-api';
@@ -7,7 +8,7 @@ import { CatalogApi } from '../../services/catalog-api';
 @Component({
   selector: 'app-listings-page',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   templateUrl: './listings-page.html',
   styleUrl: './listings-page.css',
 })

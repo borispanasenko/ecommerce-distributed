@@ -1,0 +1,63 @@
+<section class="page">
+  <a routerLink="/listings" class="back-link">← Back to products</a>
+
+  @if (product$ | async; as product) {
+    <article class="details">
+      <div class="image-box">
+        @if (getPrimaryImage(product); as imageUrl) {
+          <img [src]="imageUrl" [alt]="product.name" />
+        } @else {
+          <div class="image-placeholder">No image</div>
+        }
+      </div>
+
+      <div class="content">
+        <div class="top-line">
+          <span class="badge">{{ product.brand?.name ?? 'No brand' }}</span>
+          <span class="muted">{{ product.status }}</span>
+        </div>
+
+        <h1>{{ product.name }}</h1>
+
+        @if (product.description) {
+          <p class="description">{{ product.description }}</p>
+        }
+
+        <div class="categories">
+          @for (category of product.categories; track category.id) {
+            <span class="badge">{{ category.name }}</span>
+          }
+        </div>
+
+        <section class="section">
+          <h2>Variants</h2>
+
+          @if (product.variants.length > 0) {
+            <div class="variants">
+              @for (variant of product.variants; track variant.id) {
+                <div class="variant-card">
+                  <div>
+                    <strong>{{ variant.name }}</strong>
+                    <p class="muted">SKU: {{ variant.sku }}</p>
+                  </div>
+
+                  <div class="variant-price">
+                    {{ formatPrice(variant.priceAmountMinor, variant.currency) }}
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="muted">No variants.</p>
+          }
+        </section>
+
+        <div class="actions">
+          <button type="button" class="primary">Add to cart</button>
+        </div>
+      </div>
+    </article>
+  } @else {
+    <p class="muted">Loading product...</p>
+  }
+</section>

@@ -35,7 +35,7 @@
           </div>
 
           <div class="actions">
-            <button type="button">View details</button>
+            <a [routerLink]="['/listings', product.id]" class="button">View details</a>
             <button type="button" class="primary">Add to cart</button>
           </div>
         </article>

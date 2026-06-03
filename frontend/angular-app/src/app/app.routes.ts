@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { ListingsPageComponent } from './features/listings/pages/listings-page/listings-page';
+import { ProductDetailsPageComponent } from './features/listings/pages/product-details-page/product-details-page';
 import { OrderDetailsPageComponent } from './features/orders/pages/order-details-page/order-details-page';
 import { SellerDashboardPageComponent } from './features/seller/pages/seller-dashboard-page/seller-dashboard-page';
 
@@ -12,6 +13,10 @@ export const routes: Routes = [
   {
     path: 'listings',
     component: ListingsPageComponent,
+  },
+  {
+    path: 'listings/:id',
+    component: ProductDetailsPageComponent,
   },
   {
     path: 'orders/:id',
