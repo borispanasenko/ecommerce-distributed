@@ -2,6 +2,7 @@ using Inventory.Application.Stock;
 using Inventory.Infrastructure.Persistence;
 using Inventory.Infrastructure.Stock;
 using Microsoft.EntityFrameworkCore;
+using Inventory.Domain.Stock;
 
 namespace Inventory.Tests.Stock;
 
@@ -625,5 +626,131 @@ public sealed class InventoryStockServiceTests
             .Options;
 
         return new InventoryDbContext(options);
+    }
+
+    [Fact]
+    public async Task AllocateStockAsync_ShouldReserveFromAvailableLocation()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfInventoryStockService(dbContext);
+
+        var setup = await CreateWarehouseAndLocationAsync(service);
+
+        await service.ReceiveStockAsync(new ReceiveStockRequest(
+            Sku: "arm-blk",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 10,
+            Reason: "Initial stock"));
+
+        var result = await service.AllocateStockAsync(new AllocateStockReservationRequest(
+            Sku: "arm-blk",
+            Quantity: 3,
+            Reference: "order:test-1"));
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("ARM-BLK", result.Value.Sku);
+        Assert.Equal(setup.WarehouseId, result.Value.WarehouseId);
+        Assert.Equal(setup.LocationId, result.Value.LocationId);
+        Assert.Equal(3, result.Value.Quantity);
+        Assert.Equal("Active", result.Value.Status);
+        Assert.Equal("order:test-1", result.Value.Reference);
+
+        var stockItem = await dbContext.StockItems.SingleAsync();
+        Assert.Equal(10, stockItem.OnHandQuantity);
+        Assert.Equal(3, stockItem.ReservedQuantity);
+        Assert.Equal(7, stockItem.AvailableQuantity);
+
+        var reservationCount = await dbContext.StockReservations.CountAsync();
+        var movementCount = await dbContext.StockMovements.CountAsync();
+
+        Assert.Equal(1, reservationCount);
+        Assert.Equal(2, movementCount);
+    }
+
+    [Fact]
+    public async Task AllocateStockAsync_ShouldChooseLocationWithEnoughAvailableStock()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfInventoryStockService(dbContext);
+
+        var warehouse = await service.CreateWarehouseAsync(new CreateWarehouseRequest(
+            Code: "MAIN",
+            Name: "Main Warehouse"));
+
+        var smallLocation = await service.CreateLocationAsync(new CreateLocationRequest(
+            WarehouseId: warehouse.Value!.Id,
+            Code: "A-01-01"));
+
+        var largeLocation = await service.CreateLocationAsync(new CreateLocationRequest(
+            WarehouseId: warehouse.Value.Id,
+            Code: "A-01-02"));
+
+        await service.ReceiveStockAsync(new ReceiveStockRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: warehouse.Value.Id,
+            LocationId: smallLocation.Value!.Id,
+            Quantity: 2,
+            Reason: "Small stock"));
+
+        await service.ReceiveStockAsync(new ReceiveStockRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: warehouse.Value.Id,
+            LocationId: largeLocation.Value!.Id,
+            Quantity: 10,
+            Reason: "Large stock"));
+
+        var result = await service.AllocateStockAsync(new AllocateStockReservationRequest(
+            Sku: "ARM-BLK",
+            Quantity: 5,
+            Reference: "order:test-2"));
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(largeLocation.Value.Id, result.Value.LocationId);
+    }
+
+    [Fact]
+    public async Task AllocateStockAsync_ShouldRejectMissingSku()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfInventoryStockService(dbContext);
+
+        var result = await service.AllocateStockAsync(new AllocateStockReservationRequest(
+            Sku: "MISSING-SKU",
+            Quantity: 1,
+            Reference: "order:test-missing"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("stock_item_not_found", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task AllocateStockAsync_ShouldRejectInsufficientStock()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new EfInventoryStockService(dbContext);
+
+        var setup = await CreateWarehouseAndLocationAsync(service);
+
+        await service.ReceiveStockAsync(new ReceiveStockRequest(
+            Sku: "ARM-BLK",
+            WarehouseId: setup.WarehouseId,
+            LocationId: setup.LocationId,
+            Quantity: 2,
+            Reason: "Initial stock"));
+
+        var result = await service.AllocateStockAsync(new AllocateStockReservationRequest(
+            Sku: "ARM-BLK",
+            Quantity: 3,
+            Reference: "order:test-insufficient"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("insufficient_stock", result.ErrorCode);
+
+        var stockItem = await dbContext.StockItems.SingleAsync();
+        Assert.Equal(2, stockItem.OnHandQuantity);
+        Assert.Equal(0, stockItem.ReservedQuantity);
     }
 }

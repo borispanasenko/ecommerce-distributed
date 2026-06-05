@@ -138,6 +138,27 @@ public static class InventoryStockEndpoints
         .WithName("ReserveStock")
         .WithOpenApi();
 
+        stock.MapPost("/reservations/allocate", async (
+            AllocateStockReservationRequest request,
+            IInventoryStockService inventoryStockService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await inventoryStockService.AllocateStockAsync(request, cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new
+                {
+                    error = result.ErrorCode,
+                    message = result.ErrorMessage
+                });
+            }
+
+            return Results.Created($"/api/stock/reservations/{result.Value!.Id}", result.Value);
+        })
+        .WithName("AllocateStockReservation")
+        .WithOpenApi();
+
         stock.MapPost("/reservations/{reservationId:guid}/release", async (
             Guid reservationId,
             IInventoryStockService inventoryStockService,

@@ -365,6 +365,110 @@ public sealed class EfInventoryStockService : IInventoryStockService
         return InventoryResult<StockReservationDto>.Success(ToReservationDto(reservation));
     }
 
+    public async Task<InventoryResult<StockReservationDto>> AllocateStockAsync(
+    AllocateStockReservationRequest request,
+    CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Sku))
+        {
+            return InventoryResult<StockReservationDto>.Failure(
+                "sku_required",
+                "SKU is required.");
+        }
+
+        if (request.Quantity <= 0)
+        {
+            return InventoryResult<StockReservationDto>.Failure(
+                "reservation_quantity_invalid",
+                "Reservation quantity must be greater than zero.");
+        }
+
+        var normalizedSku = request.Sku.Trim().ToUpperInvariant();
+
+        var stockItemExists = await _dbContext.StockItems
+            .AnyAsync(item => item.Sku == normalizedSku, cancellationToken);
+
+        if (!stockItemExists)
+        {
+            return InventoryResult<StockReservationDto>.Failure(
+                "stock_item_not_found",
+                "Stock item was not found for the specified SKU.");
+        }
+
+        var stockItem = await _dbContext.StockItems
+            .Include(item => item.Warehouse)
+            .Include(item => item.Location)
+            .Where(item =>
+                item.Sku == normalizedSku &&
+                item.Warehouse.IsActive &&
+                item.Location.IsActive &&
+                item.OnHandQuantity - item.ReservedQuantity >= request.Quantity)
+            .OrderBy(item => item.Warehouse.Code)
+            .ThenBy(item => item.Location.Code)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (stockItem is null)
+        {
+            return InventoryResult<StockReservationDto>.Failure(
+                "insufficient_stock",
+                "Not enough available stock for the specified SKU.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var reference = request.Reference?.Trim();
+
+        stockItem.ReservedQuantity += request.Quantity;
+        stockItem.UpdatedAt = now;
+
+        var reservation = new StockReservation
+        {
+            Id = Guid.NewGuid(),
+            Sku = normalizedSku,
+            WarehouseId = stockItem.WarehouseId,
+            Warehouse = stockItem.Warehouse,
+            LocationId = stockItem.LocationId,
+            Location = stockItem.Location,
+            Quantity = request.Quantity,
+            Status = StockReservationStatus.Active,
+            Reference = reference,
+            CreatedAt = now,
+            ReleasedAt = null,
+            CommittedAt = null
+        };
+
+        var movement = new StockMovement
+        {
+            Id = Guid.NewGuid(),
+            Sku = normalizedSku,
+            WarehouseId = stockItem.WarehouseId,
+            Warehouse = stockItem.Warehouse,
+            LocationId = stockItem.LocationId,
+            Location = stockItem.Location,
+            Type = StockMovementType.Reservation,
+            Quantity = request.Quantity,
+            Reason = reference,
+            CreatedAt = now
+        };
+
+        _dbContext.StockReservations.Add(reservation);
+        _dbContext.StockMovements.Add(movement);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return InventoryResult<StockReservationDto>.Success(
+            new StockReservationDto(
+                reservation.Id,
+                reservation.Sku,
+                reservation.WarehouseId,
+                reservation.LocationId,
+                reservation.Quantity,
+                reservation.Status.ToString(),
+                reservation.Reference,
+                reservation.CreatedAt,
+                reservation.ReleasedAt,
+                reservation.CommittedAt));
+    }
+
     public async Task<InventoryResult<StockReservationDto>> ReleaseReservationAsync(
         Guid reservationId,
         CancellationToken cancellationToken = default)

@@ -25,6 +25,10 @@ public interface IInventoryStockService
         CreateStockReservationRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<InventoryResult<StockReservationDto>> AllocateStockAsync(
+        AllocateStockReservationRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<InventoryResult<StockReservationDto>> ReleaseReservationAsync(
         Guid reservationId,
         CancellationToken cancellationToken = default);
@@ -111,6 +115,11 @@ public sealed record CreateStockReservationRequest(
     string Sku,
     Guid WarehouseId,
     Guid LocationId,
+    long Quantity,
+    string? Reference);
+
+public sealed record AllocateStockReservationRequest(
+    string Sku,
     long Quantity,
     string? Reference);
 
