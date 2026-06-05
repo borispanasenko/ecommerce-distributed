@@ -97,20 +97,6 @@ public sealed class EfOrderingService : IOrderingService
                     "Quantity must be greater than zero.");
             }
 
-            if (item.WarehouseId == Guid.Empty)
-            {
-                return OrderingResult<OrderDetailsDto>.Failure(
-                    "warehouse_id_required",
-                    "Warehouse id is required.");
-            }
-
-            if (item.LocationId == Guid.Empty)
-            {
-                return OrderingResult<OrderDetailsDto>.Failure(
-                    "location_id_required",
-                    "Location id is required.");
-            }
-
             if (string.IsNullOrWhiteSpace(item.Currency) || item.Currency.Trim().Length != 3)
             {
                 return OrderingResult<OrderDetailsDto>.Failure(
@@ -153,11 +139,9 @@ public sealed class EfOrderingService : IOrderingService
 
         foreach (var item in normalizedItems)
         {
-            var reservationResult = await _inventoryClient.ReserveStockAsync(
-                new ReserveStockRequest(
+            var reservationResult = await _inventoryClient.AllocateStockAsync(
+                new AllocateStockRequest(
                     Sku: item.Sku,
-                    WarehouseId: item.WarehouseId,
-                    LocationId: item.LocationId,
                     Quantity: item.Quantity,
                     Reference: $"ORDER-{order.Id}"),
                 cancellationToken);
@@ -176,8 +160,6 @@ public sealed class EfOrderingService : IOrderingService
 
             var inventoryReservationId = reservationResult.Value!.Id;
             createdReservationIds.Add(inventoryReservationId);
-
-
 
             var lineTotal = item.UnitPriceAmountMinor * item.Quantity;
 

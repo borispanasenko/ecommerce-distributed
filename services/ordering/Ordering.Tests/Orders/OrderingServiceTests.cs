@@ -28,11 +28,10 @@ public sealed class OrderingServiceTests
         Assert.Single(result.Value.Items);
         Assert.NotNull(result.Value.Items[0].InventoryReservationId);
 
-        Assert.Single(inventoryClient.ReserveRequests);
-        Assert.Equal("ARM-BLK", inventoryClient.ReserveRequests[0].Sku);
-        Assert.Equal(2, inventoryClient.ReserveRequests[0].Quantity);
-        Assert.Equal(WarehouseId, inventoryClient.ReserveRequests[0].WarehouseId);
-        Assert.Equal(LocationId, inventoryClient.ReserveRequests[0].LocationId);
+        Assert.Single(inventoryClient.AllocateRequests);
+        Assert.Equal("ARM-BLK", inventoryClient.AllocateRequests[0].Sku);
+        Assert.Equal(2, inventoryClient.AllocateRequests[0].Quantity);
+        Assert.StartsWith("ORDER-", inventoryClient.AllocateRequests[0].Reference);
 
         var orderExists = await dbContext.Orders
             .AnyAsync(order => order.Id == result.Value.Id);
@@ -222,43 +221,27 @@ public sealed class OrderingServiceTests
     }
 
     [Fact]
-    public async Task CreateOrderAsync_ShouldRejectMissingWarehouseId()
+    public async Task CreateOrderAsync_ShouldNotRequireWarehouseOrLocation()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out var inventoryClient);
 
-        var request = new CreateOrderRequest(
+        var result = await service.CreateOrderAsync(new CreateOrderRequest(
             CustomerName: "Test Customer",
             CustomerEmail: "test@example.com",
             Items:
             [
-                CreateOrderItem(warehouseId: Guid.Empty)
-            ]);
+                CreateOrderItem(
+                    warehouseId: Guid.Empty,
+                    locationId: Guid.Empty)
+            ]));
 
-        var result = await service.CreateOrderAsync(request);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
 
-        Assert.False(result.IsSuccess);
-        Assert.Equal("warehouse_id_required", result.ErrorCode);
-    }
-
-    [Fact]
-    public async Task CreateOrderAsync_ShouldRejectMissingLocationId()
-    {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
-
-        var request = new CreateOrderRequest(
-            CustomerName: "Test Customer",
-            CustomerEmail: "test@example.com",
-            Items:
-            [
-                CreateOrderItem(locationId: Guid.Empty)
-            ]);
-
-        var result = await service.CreateOrderAsync(request);
-
-        Assert.False(result.IsSuccess);
-        Assert.Equal("location_id_required", result.ErrorCode);
+        Assert.Single(inventoryClient.AllocateRequests);
+        Assert.Equal("ARM-BLK", inventoryClient.AllocateRequests[0].Sku);
+        Assert.Equal(1, inventoryClient.AllocateRequests[0].Quantity);
     }
 
     [Fact]
@@ -267,7 +250,7 @@ public sealed class OrderingServiceTests
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext, out var inventoryClient);
 
-        inventoryClient.NextReserveResult =
+        inventoryClient.NextAllocateResult =
             InventoryClientResult<InventoryReservationDto>.Failure(
                 "insufficient_stock",
                 "Not enough available stock to reserve.");
@@ -512,24 +495,24 @@ public sealed class OrderingServiceTests
 
     private sealed class FakeInventoryClient : IInventoryClient
     {
-        public List<ReserveStockRequest> ReserveRequests { get; } = [];
+        public List<AllocateStockRequest> AllocateRequests { get; } = [];
 
         public List<Guid> ReleaseRequests { get; } = [];
 
         public List<Guid> CommitRequests { get; } = [];
 
-        public InventoryClientResult<InventoryReservationDto>? NextReserveResult { get; set; }
+        public InventoryClientResult<InventoryReservationDto>? NextAllocateResult { get; set; }
 
-        public Task<InventoryClientResult<InventoryReservationDto>> ReserveStockAsync(
-            ReserveStockRequest request,
+        public Task<InventoryClientResult<InventoryReservationDto>> AllocateStockAsync(
+            AllocateStockRequest request,
             CancellationToken cancellationToken = default)
         {
-            ReserveRequests.Add(request);
+            AllocateRequests.Add(request);
 
-            if (NextReserveResult is not null)
+            if (NextAllocateResult is not null)
             {
-                var result = NextReserveResult;
-                NextReserveResult = null;
+                var result = NextAllocateResult;
+                NextAllocateResult = null;
 
                 return Task.FromResult(result);
             }
@@ -537,8 +520,8 @@ public sealed class OrderingServiceTests
             var reservation = new InventoryReservationDto(
                 Id: Guid.NewGuid(),
                 Sku: request.Sku,
-                WarehouseId: request.WarehouseId,
-                LocationId: request.LocationId,
+                WarehouseId: WarehouseId,
+                LocationId: LocationId,
                 Quantity: request.Quantity,
                 Status: "Active",
                 Reference: request.Reference,

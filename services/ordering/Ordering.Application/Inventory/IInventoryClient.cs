@@ -2,8 +2,8 @@ namespace Ordering.Application.Inventory;
 
 public interface IInventoryClient
 {
-    Task<InventoryClientResult<InventoryReservationDto>> ReserveStockAsync(
-        ReserveStockRequest request,
+    Task<InventoryClientResult<InventoryReservationDto>> AllocateStockAsync(
+        AllocateStockRequest request,
         CancellationToken cancellationToken = default);
 
     Task<InventoryClientResult<InventoryReservationDto>> ReleaseReservationAsync(
@@ -15,10 +15,8 @@ public interface IInventoryClient
         CancellationToken cancellationToken = default);
 }
 
-public sealed record ReserveStockRequest(
+public sealed record AllocateStockRequest(
     string Sku,
-    Guid WarehouseId,
-    Guid LocationId,
     long Quantity,
     string? Reference);
 

@@ -12,12 +12,12 @@ public sealed class HttpInventoryClient : IInventoryClient
         _httpClient = httpClient;
     }
 
-    public async Task<InventoryClientResult<InventoryReservationDto>> ReserveStockAsync(
-        ReserveStockRequest request,
+    public async Task<InventoryClientResult<InventoryReservationDto>> AllocateStockAsync(
+        AllocateStockRequest request,
         CancellationToken cancellationToken = default)
     {
         var response = await _httpClient.PostAsJsonAsync(
-            "/api/stock/reservations",
+            "/api/stock/reservations/allocate",
             request,
             cancellationToken);
 
@@ -40,8 +40,8 @@ public sealed class HttpInventoryClient : IInventoryClient
             cancellationToken: cancellationToken);
 
         return InventoryClientResult<InventoryReservationDto>.Failure(
-            error?.Error ?? "inventory_reservation_failed",
-            error?.Message ?? "Inventory reservation failed.");
+            error?.Error ?? "inventory_allocation_failed",
+            error?.Message ?? "Inventory stock allocation failed.");
     }
 
     public async Task<InventoryClientResult<InventoryReservationDto>> ReleaseReservationAsync(
