@@ -3,6 +3,8 @@ import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BehaviorSubject, combineLatest, firstValueFrom, map, switchMap } from 'rxjs';
 
+import { getHttpErrorMessage } from '../../../../shared/utils/http-error-message';
+
 import { PaymentApi } from '../../../payments/services/payment-api';
 import { OrderDetails } from '../../models/order';
 import { OrderingApi } from '../../services/ordering-api';
@@ -72,7 +74,9 @@ export class OrderDetailsPageComponent {
       this.refreshOrder.next();
     } catch (error) {
       console.error('Payment failed', error);
-      this.paymentErrorMessage.set('Payment failed. Check Payment, Ordering and Inventory APIs.');
+      this.paymentErrorMessage.set(
+        getHttpErrorMessage(error, 'Payment failed. Check Payment, Ordering and Inventory APIs.'),
+      );
     } finally {
       this.isPaying.set(false);
     }

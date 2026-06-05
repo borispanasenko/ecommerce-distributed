@@ -7,8 +7,8 @@ import { firstValueFrom } from 'rxjs';
 import { OrderingApi } from '../../../orders/services/ordering-api';
 import { CartStore } from '../../services/cart-store';
 
-const DEFAULT_WAREHOUSE_ID = '1a279d4c-ee02-4c86-bd4d-175f4098a709';
-const DEFAULT_LOCATION_ID = '38a754af-e46e-4d4e-a014-a8dc68cda9fa';
+import { CHECKOUT_STOCK_LOCATION } from '../../../../core/services/checkout-config';
+import { getHttpErrorMessage } from '../../../../shared/utils/http-error-message';
 
 @Component({
   selector: 'app-cart-page',
@@ -94,8 +94,8 @@ export class CartPageComponent {
             unitPriceAmountMinor: item.unitPriceAmountMinor,
             currency: item.currency,
             quantity: item.quantity,
-            warehouseId: DEFAULT_WAREHOUSE_ID,
-            locationId: DEFAULT_LOCATION_ID,
+            warehouseId: CHECKOUT_STOCK_LOCATION.warehouseId,
+            locationId: CHECKOUT_STOCK_LOCATION.locationId,
           })),
         }),
       );
@@ -103,8 +103,11 @@ export class CartPageComponent {
       this.cartStore.clear();
 
       await this.router.navigate(['/orders', order.id]);
-    } catch {
-      this.errorMessage.set('Checkout failed. Check Inventory stock and Ordering API.');
+    } catch (error) {
+      console.error('Checkout failed', error);
+      this.errorMessage.set(getHttpErrorMessage(
+        error, 'Checkout failed. Check Inventory stock and Ordering API.'),
+      );
     } finally {
       this.isSubmitting.set(false);
     }
