@@ -1,18 +1,33 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 
+import { OrderingApi } from '../../../orders/services/ordering-api';
 import { CartStore } from '../../services/cart-store';
+
+const DEFAULT_WAREHOUSE_ID = '1a279d4c-ee02-4c86-bd4d-175f4098a709';
+const DEFAULT_LOCATION_ID = '38a754af-e46e-4d4e-a014-a8dc68cda9fa';
 
 @Component({
   selector: 'app-cart-page',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './cart-page.html',
   styleUrl: './cart-page.css',
 })
 export class CartPageComponent {
   protected readonly cartStore = inject(CartStore);
+
+  private readonly orderingApi = inject(OrderingApi);
+  private readonly router = inject(Router);
+
+  protected customerName = '';
+  protected customerEmail = '';
+
+  protected readonly isSubmitting = signal(false);
+  protected readonly errorMessage = signal<string | null>(null);
 
   protected formatPrice(priceAmountMinor: number, currency: string): string {
     return new Intl.NumberFormat('en-US', {
@@ -34,5 +49,64 @@ export class CartPageComponent {
 
   protected getCartCurrency(): string {
     return this.cartStore.items()[0]?.currency ?? 'USD';
+  }
+
+  protected async checkout(): Promise<void> {
+    if (this.isSubmitting()) {
+    return;
+  }
+
+    this.errorMessage.set(null);
+
+    const customerName = this.customerName.trim();
+    const customerEmail = this.customerEmail.trim();
+
+    if (this.cartStore.items().length === 0) {
+      this.errorMessage.set('Cart is empty.');
+      return;
+    }
+
+    if (!customerName || !customerEmail) {
+      this.errorMessage.set('Customer name and email are required.');
+      return;
+    }
+
+    const currencies = new Set(this.cartStore.items().map((item) => item.currency));
+
+    if (currencies.size > 1) {
+      this.errorMessage.set('Cart items must use the same currency.');
+      return;
+    }
+
+    this.isSubmitting.set(true);
+
+    try {
+      const order = await firstValueFrom(
+        this.orderingApi.createOrder({
+          customerName,
+          customerEmail,
+          items: this.cartStore.items().map((item) => ({
+            productId: item.productId,
+            productVariantId: item.productVariantId,
+            sku: item.sku,
+            productName: item.productName,
+            variantName: item.variantName,
+            unitPriceAmountMinor: item.unitPriceAmountMinor,
+            currency: item.currency,
+            quantity: item.quantity,
+            warehouseId: DEFAULT_WAREHOUSE_ID,
+            locationId: DEFAULT_LOCATION_ID,
+          })),
+        }),
+      );
+
+      this.cartStore.clear();
+
+      await this.router.navigate(['/orders', order.id]);
+    } catch {
+      this.errorMessage.set('Checkout failed. Check Inventory stock and Ordering API.');
+    } finally {
+      this.isSubmitting.set(false);
+    }
   }
 }

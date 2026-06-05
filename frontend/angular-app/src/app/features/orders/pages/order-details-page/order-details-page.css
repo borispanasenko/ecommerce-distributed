@@ -2,6 +2,13 @@
   padding: 24px;
 }
 
+.back-link {
+  display: inline-block;
+  margin-bottom: 16px;
+  color: #111;
+  text-decoration: none;
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -21,6 +28,10 @@ h1 {
   margin: 0 0 8px;
 }
 
+h2 {
+  margin: 0 0 16px;
+}
+
 .subtitle {
   margin: 0;
   color: #666;
@@ -34,9 +45,17 @@ h1 {
   white-space: nowrap;
 }
 
+.status.paid {
+  background: #166534;
+}
+
+.status.cancelled {
+  background: #991b1b;
+}
+
 .layout {
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
 
@@ -62,15 +81,24 @@ h1 {
   font-weight: 600;
 }
 
-.timeline {
+.state-list {
   display: grid;
   gap: 16px;
 }
 
-.timeline-item {
+.state-item {
   display: flex;
   gap: 12px;
   align-items: start;
+  color: #777;
+}
+
+.state-item.done {
+  color: #111;
+}
+
+.state-item.cancelled {
+  color: #991b1b;
 }
 
 .dot {
@@ -81,27 +109,100 @@ h1 {
   background: #d0d0d0;
 }
 
-.dot.done {
+.state-item.done .dot {
   background: #111;
 }
 
-.dot.current {
-  background: #666;
+.state-item.cancelled .dot {
+  background: #991b1b;
 }
 
-.event-label {
-  margin: 0 0 4px;
-  font-weight: 600;
-}
-
-.event-time {
-  margin: 0;
+.state-item p {
+  margin: 4px 0 0;
   color: #666;
-  font-size: 14px;
+}
+
+.items-panel {
+  margin-top: 16px;
+}
+
+.items {
+  display: grid;
+  gap: 12px;
+}
+
+.item-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+}
+
+.item-row p {
+  margin: 4px 0 0;
+}
+
+.item-meta {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  white-space: nowrap;
+}
+
+.muted {
+  color: #666;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+button {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+}
+
+button.primary {
+  background: #111;
+  color: white;
+  border-color: #111;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: -8px 0 16px;
+  color: #991b1b;
 }
 
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
+  }
+
+  .page-header,
+  .item-row {
+    display: grid;
+  }
+
+  .item-meta {
+    justify-items: start;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
   }
 }

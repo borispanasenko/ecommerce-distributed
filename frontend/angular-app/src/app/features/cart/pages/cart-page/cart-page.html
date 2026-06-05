@@ -3,7 +3,7 @@
     <div>
       <p class="eyebrow">Cart</p>
       <h1>Your cart</h1>
-      <p class="subtitle">Client-side cart. Checkout will create an order later.</p>
+      <p class="subtitle">Checkout creates an order and reserves Inventory stock.</p>
     </div>
 
     <a routerLink="/listings" class="button">Continue shopping</a>
@@ -37,6 +37,34 @@
         </article>
       }
 
+      <section class="checkout-panel">
+        <h2>Checkout</h2>
+
+        <label>
+          Customer name
+          <input
+            type="text"
+            name="customerName"
+            [(ngModel)]="customerName"
+            placeholder="Test Customer"
+          />
+        </label>
+
+        <label>
+          Customer email
+          <input
+            type="email"
+            name="customerEmail"
+            [(ngModel)]="customerEmail"
+            placeholder="test@example.com"
+          />
+        </label>
+
+        @if (errorMessage()) {
+          <p class="error">{{ errorMessage() }}</p>
+        }
+      </section>
+
       <footer class="summary">
         <div>
           <span class="muted">Items</span>
@@ -48,7 +76,14 @@
           <strong>{{ formatPrice(getCartTotalAmountMinor(), getCartCurrency()) }}</strong>
         </div>
 
-        <button type="button" class="primary">Checkout</button>
+        <button
+          type="button"
+          class="primary"
+          [disabled]="isSubmitting()"
+          (click)="checkout()"
+        >
+          {{ isSubmitting() ? 'Creating order...' : 'Checkout' }}
+        </button>
       </footer>
     </div>
   } @else {

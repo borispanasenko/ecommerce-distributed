@@ -124,6 +124,43 @@ button.danger {
   border-color: #e5b8b8;
 }
 
+.checkout-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.checkout-panel h2 {
+  margin: 0;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+
+input {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.error {
+  margin: 0;
+  color: #991b1b;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 760px) {
   .page-header {
     display: grid;

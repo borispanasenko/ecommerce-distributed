@@ -1,63 +1,111 @@
-import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { BehaviorSubject, combineLatest, firstValueFrom, map, switchMap } from 'rxjs';
 
-type OrderStatus =
-  | 'Created'
-  | 'InventoryReserved'
-  | 'PaymentProcessing'
-  | 'Paid'
-  | 'ShipmentCreated'
-  | 'Completed';
-
-type TimelineEvent = {
-  label: string;
-  status: 'done' | 'current' | 'upcoming';
-  timestamp: string;
-};
+import { PaymentApi } from '../../../payments/services/payment-api';
+import { OrderDetails } from '../../models/order';
+import { OrderingApi } from '../../services/ordering-api';
 
 @Component({
   selector: 'app-order-details-page',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   templateUrl: './order-details-page.html',
   styleUrl: './order-details-page.css',
 })
 export class OrderDetailsPageComponent {
-  protected readonly order = {
-    id: 'ord-9001',
-    listingTitle: 'Mechanical Keyboard Keychron K2',
-    buyerName: 'Boris Panasenko',
-    sellerName: 'Alex Mercer',
-    amount: 89,
-    currency: 'USD',
-    status: 'PaymentProcessing' as OrderStatus,
-  };
+  private readonly route = inject(ActivatedRoute);
+  private readonly orderingApi = inject(OrderingApi);
+  private readonly paymentApi = inject(PaymentApi);
 
-  protected readonly timeline: TimelineEvent[] = [
-    {
-      label: 'Order created',
-      status: 'done',
-      timestamp: '2026-04-12 10:01',
-    },
-    {
-      label: 'Inventory reserved',
-      status: 'done',
-      timestamp: '2026-04-12 10:02',
-    },
-    {
-      label: 'Payment processing',
-      status: 'current',
-      timestamp: '2026-04-12 10:03',
-    },
-    {
-      label: 'Shipment created',
-      status: 'upcoming',
-      timestamp: 'Pending',
-    },
-    {
-      label: 'Completed',
-      status: 'upcoming',
-      timestamp: 'Pending',
-    },
-  ];
+  private readonly refreshOrder = new BehaviorSubject<void>(undefined);
+
+  protected readonly isPaying = signal(false);
+  protected readonly paymentErrorMessage = signal<string | null>(null);
+
+  protected readonly order$ = combineLatest([
+    this.route.paramMap.pipe(
+      map((params) => {
+        const orderId = params.get('id');
+
+        if (!orderId) {
+          throw new Error('Order id route parameter is required.');
+        }
+
+        return orderId;
+      }),
+    ),
+    this.refreshOrder,
+  ]).pipe(
+    switchMap(([orderId]) => this.orderingApi.getOrderById(orderId)),
+  );
+
+  protected async payNow(order: OrderDetails): Promise<void> {
+    if (this.isPaying()) {
+      return;
+    }
+
+    if (order.status !== 'PendingPayment') {
+      return;
+    }
+
+    this.paymentErrorMessage.set(null);
+    this.isPaying.set(true);
+
+    try {
+      const payment = await firstValueFrom(
+        this.paymentApi.createPayment({
+          orderId: order.id,
+          amountMinor: order.totalAmountMinor,
+          currency: order.currency,
+          provider: 'Manual',
+        }),
+      );
+
+      await firstValueFrom(
+        this.paymentApi.succeedPayment(payment.id, {
+          providerReference: `FRONTEND-APPROVED-${Date.now()}`,
+        }),
+      );
+
+      this.refreshOrder.next();
+    } catch (error) {
+      console.error('Payment failed', error);
+      this.paymentErrorMessage.set('Payment failed. Check Payment, Ordering and Inventory APIs.');
+    } finally {
+      this.isPaying.set(false);
+    }
+  }
+
+  protected getStatusLabel(status: string): string {
+    switch (status) {
+      case 'PendingPayment':
+        return 'Awaiting payment';
+      case 'Paid':
+        return 'Paid';
+      case 'Cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  }
+
+  protected formatPrice(priceAmountMinor: number, currency: string): string {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+    }).format(priceAmountMinor / 100);
+  }
+
+  protected formatDate(value: string): string {
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(value));
+  }
+
+  protected hasInventoryReservations(order: OrderDetails): boolean {
+    return order.items.some((item) => item.inventoryReservationId !== null);
+  }
 }

@@ -1,51 +1,122 @@
 <section class="page">
-  <header class="page-header">
-    <div>
-      <p class="eyebrow">Transaction</p>
-      <h1>Order {{ order.id }}</h1>
-      <p class="subtitle">Track the lifecycle of the order through the workflow.</p>
+  <a routerLink="/listings" class="back-link">← Back to products</a>
+
+  @if (order$ | async; as order) {
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Order</p>
+        <h1>Order {{ order.id }}</h1>
+        <p class="subtitle">
+          Created {{ formatDate(order.createdAt) }} · Updated {{ formatDate(order.updatedAt) }}
+        </p>
+      </div>
+
+      <div class="header-actions">
+        <span class="status" [class.paid]="order.status === 'Paid'" [class.cancelled]="order.status === 'Cancelled'">
+          {{ getStatusLabel(order.status) }}
+        </span>
+
+        @if (order.status === 'PendingPayment') {
+          <button
+            type="button"
+            class="primary"
+            [disabled]="isPaying()"
+            (click)="payNow(order)"
+          >
+            {{ isPaying() ? 'Processing payment...' : 'Pay now' }}
+          </button>
+        }
+      </div>
+    </header>
+
+    @if (paymentErrorMessage()) {
+      <p class="error">{{ paymentErrorMessage() }}</p>
+    }
+
+    <div class="layout">
+      <article class="panel">
+        <h2>Customer</h2>
+
+        <dl class="summary">
+          <div>
+            <dt>Name</dt>
+            <dd>{{ order.customerName }}</dd>
+          </div>
+
+          <div>
+            <dt>Email</dt>
+            <dd>{{ order.customerEmail }}</dd>
+          </div>
+
+          <div>
+            <dt>Total</dt>
+            <dd>{{ formatPrice(order.totalAmountMinor, order.currency) }}</dd>
+          </div>
+
+          <div>
+            <dt>Inventory reservation</dt>
+            <dd>{{ hasInventoryReservations(order) ? 'Created' : 'Not created' }}</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="panel">
+        <h2>Backend state</h2>
+
+        <div class="state-list">
+          <div class="state-item done">
+            <span class="dot"></span>
+            <div>
+              <strong>Order created</strong>
+              <p>{{ formatDate(order.createdAt) }}</p>
+            </div>
+          </div>
+
+          <div class="state-item" [class.done]="hasInventoryReservations(order)">
+            <span class="dot"></span>
+            <div>
+              <strong>Inventory reserved</strong>
+              <p>{{ hasInventoryReservations(order) ? 'Reservation id is stored on order item' : 'No reservation id' }}</p>
+            </div>
+          </div>
+
+          <div class="state-item" [class.done]="order.status === 'Paid'" [class.cancelled]="order.status === 'Cancelled'">
+            <span class="dot"></span>
+            <div>
+              <strong>Order status</strong>
+              <p>{{ getStatusLabel(order.status) }}</p>
+            </div>
+          </div>
+        </div>
+      </article>
     </div>
 
-    <span class="status">{{ order.status }}</span>
-  </header>
+    <article class="panel items-panel">
+      <h2>Items</h2>
 
-  <div class="layout">
-    <article class="panel">
-      <h2>Order summary</h2>
-      <dl class="summary">
-        <div>
-          <dt>Listing</dt>
-          <dd>{{ order.listingTitle }}</dd>
-        </div>
-        <div>
-          <dt>Buyer</dt>
-          <dd>{{ order.buyerName }}</dd>
-        </div>
-        <div>
-          <dt>Seller</dt>
-          <dd>{{ order.sellerName }}</dd>
-        </div>
-        <div>
-          <dt>Amount</dt>
-          <dd>{{ order.amount }} {{ order.currency }}</dd>
-        </div>
-      </dl>
-    </article>
+      <div class="items">
+        @for (item of order.items; track item.id) {
+          <div class="item-row">
+            <div>
+              <strong>{{ item.productName }}</strong>
+              <p class="muted">
+                {{ item.variantName }} · SKU: {{ item.sku }}
+              </p>
 
-    <article class="panel">
-      <h2>Timeline</h2>
+              @if (item.inventoryReservationId) {
+                <p class="muted">Reservation: {{ item.inventoryReservationId }}</p>
+              }
+            </div>
 
-      <div class="timeline">
-        @for (event of timeline; track event.label) {
-          <div class="timeline-item">
-            <div class="dot" [class.done]="event.status === 'done'" [class.current]="event.status === 'current'"></div>
-            <div class="content">
-              <p class="event-label">{{ event.label }}</p>
-              <p class="event-time">{{ event.timestamp }}</p>
+            <div class="item-meta">
+              <span>{{ item.quantity }} × {{ formatPrice(item.unitPriceAmountMinor, item.currency) }}</span>
+              <strong>{{ formatPrice(item.lineTotalAmountMinor, item.currency) }}</strong>
             </div>
           </div>
         }
       </div>
     </article>
-  </div>
+  } @else {
+    <p class="muted">Loading order...</p>
+  }
 </section>
