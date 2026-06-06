@@ -85,13 +85,7 @@ export class CartPageComponent {
           customerName,
           customerEmail,
           items: this.cartStore.items().map((item) => ({
-            productId: item.productId,
             productVariantId: item.productVariantId,
-            sku: item.sku,
-            productName: item.productName,
-            variantName: item.variantName,
-            unitPriceAmountMinor: item.unitPriceAmountMinor,
-            currency: item.currency,
             quantity: item.quantity,
           })),
         }),

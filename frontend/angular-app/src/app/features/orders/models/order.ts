@@ -25,13 +25,7 @@ export type OrderDetails = {
 };
 
 export type CreateOrderItemRequest = {
-  productId: string;
   productVariantId: string;
-  sku: string;
-  productName: string;
-  variantName: string;
-  unitPriceAmountMinor: number;
-  currency: string;
   quantity: number;
 };
 
