@@ -5,9 +5,9 @@ Small distributed commerce system.
 ## Services
 
 ```text
-catalog   - products, brands, categories, variants/SKUs
-inventory - warehouses, locations, stock, reservations
-ordering  - orders, product snapshots and inventory reservations
+catalog   - products, brands, categories, variants/SKUs and current prices
+inventory - warehouses, locations, stock, reservations and stock allocation
+ordering  - orders, product snapshots and inventory reservation references
 payment   - payment records and payment simulation
 frontend  - Angular UI
 ```
@@ -17,9 +17,9 @@ frontend  - Angular UI
 ```text
 Catalog   - working backend flow, API, tests, documentation
 Inventory - working backend flow, API, tests, documentation
-Ordering  - working backend flow, Inventory integration, API, tests, documentation
+Ordering  - working backend flow, Catalog and Inventory integration, API, tests, documentation
 Payment   - working backend flow, Ordering integration, API, tests, documentation
-Frontend  - scaffold
+Frontend  - working catalog browsing, cart, checkout and payment flow
 ```
 
 ## Catalog flow
@@ -32,6 +32,7 @@ Add product variant/SKU
 Publish product
 List active products
 Get product details
+Get active product variant snapshot
 Archive product
 ```
 
@@ -48,6 +49,7 @@ POST /api/categories
 
 GET  /api/products
 GET  /api/products/{id}
+GET  /api/products/variants/{variantId}/snapshot
 POST /api/products
 POST /api/products/{id}/variants
 POST /api/products/{id}/publish
@@ -61,7 +63,8 @@ Create warehouse
 Create storage location
 Receive stock for SKU
 Get stock by SKU
-Reserve stock
+Reserve stock explicitly
+Allocate stock reservation by SKU
 Release reservation
 Commit reservation
 Get stock movements
@@ -83,6 +86,7 @@ GET  /api/stock/{sku}
 GET  /api/stock/movements
 
 POST /api/stock/reservations
+POST /api/stock/reservations/allocate
 POST /api/stock/reservations/{id}/release
 POST /api/stock/reservations/{id}/commit
 ```
@@ -90,8 +94,9 @@ POST /api/stock/reservations/{id}/commit
 ## Ordering flow
 
 ```text
-Create order from product snapshot data
-Reserve Inventory stock
+Create order from product variant IDs and quantities
+Load product snapshots from Catalog
+Allocate Inventory stock reservations by SKU
 Store inventoryReservationId on order item
 Calculate line totals
 Calculate order total
@@ -143,15 +148,23 @@ POST /api/payments/{id}/fail
 ## End-to-end flows
 
 ```text
-Catalog defines product variants and SKUs.
+Catalog defines product variants, SKUs and current prices.
 Inventory stores stock by SKU.
-Ordering creates orders from product snapshot data.
-Ordering reserves Inventory stock when an order is created.
+Ordering creates orders from product variant IDs and quantities.
+Ordering loads trusted product snapshots from Catalog.
+Ordering asks Inventory to allocate stock reservations by SKU.
 Ordering releases Inventory reservation when an order is cancelled.
 Payment stores simulated payment records for orders.
 Payment calls Ordering when a pending payment succeeds.
 Ordering marks the order as Paid.
 Ordering commits Inventory reservation when order is marked as Paid.
+```
+
+Current MVP simplification:
+
+```text
+Payment success currently leads to Inventory reservation commit through Ordering.
+In a fuller commerce flow, Inventory commit should move closer to fulfillment/shipment.
 ```
 
 Completed scenarios:
@@ -160,8 +173,9 @@ Completed scenarios:
 Cancel flow:
 Product exists in Catalog
 Stock exists in Inventory
-Order is created in Ordering
-Inventory stock is reserved
+Order is created in Ordering from product variant ID and quantity
+Ordering loads product snapshot from Catalog
+Inventory stock reservation is allocated
 Order stores inventoryReservationId
 Order is cancelled
 Inventory reservation is released
@@ -171,8 +185,9 @@ Inventory reservation is released
 Payment success flow:
 Product exists in Catalog
 Stock exists in Inventory
-Order is created in Ordering
-Inventory stock is reserved
+Order is created in Ordering from product variant ID and quantity
+Ordering loads product snapshot from Catalog
+Inventory stock reservation is allocated
 Order stores inventoryReservationId
 Payment is created for the order
 Payment is marked as Succeeded
@@ -197,6 +212,23 @@ Start databases and services:
 
 ```bash
 docker compose up -d
+```
+
+Docker Compose local service ports:
+
+```text
+Catalog API   - http://localhost:5001
+Ordering API  - http://localhost:5002
+Inventory API - http://localhost:5003
+Payment API   - http://localhost:5004
+```
+
+Inside Docker Compose, services use internal service names:
+
+```text
+Ordering -> Catalog:   http://catalog-api:8080
+Ordering -> Inventory: http://inventory-api:8080
+Payment  -> Ordering:  http://ordering-api:8080
 ```
 
 Catalog database from host:
@@ -241,21 +273,16 @@ dotnet run --project services/inventory/Inventory.Api/Inventory.Api.csproj
 
 ## Run Ordering API locally
 
-Ordering API requires Inventory API for stock reservations.
+Ordering API requires Catalog API for product snapshots and Inventory API for stock reservations.
 
-Run Inventory API first:
-
-```bash
-ASPNETCORE_ENVIRONMENT=Development \
-ConnectionStrings__DefaultConnection="Host=localhost;Port=5435;Database=inventory_db;Username=postgres;Password=postgres" \
-dotnet run --project services/inventory/Inventory.Api/Inventory.Api.csproj
-```
+Run Catalog API and Inventory API first.
 
 Then run Ordering API:
 
 ```bash
 ASPNETCORE_ENVIRONMENT=Development \
 ConnectionStrings__DefaultConnection="Host=localhost;Port=5434;Database=ordering_db;Username=postgres;Password=postgres" \
+CatalogApi__BaseUrl="http://localhost:5001" \
 InventoryApi__BaseUrl="http://localhost:5245" \
 dotnet run --project services/ordering/Ordering.Api/Ordering.Api.csproj
 ```
@@ -264,7 +291,7 @@ dotnet run --project services/ordering/Ordering.Api/Ordering.Api.csproj
 
 Payment API requires Ordering API for successful payment flow.
 
-Run Inventory API and Ordering API first.
+Run Catalog API, Inventory API and Ordering API first.
 
 Then run Payment API:
 
@@ -368,6 +395,7 @@ storage locations
 stock balances
 stock movements
 stock reservations
+stock allocation
 ```
 
 Ordering owns:
@@ -378,6 +406,7 @@ order items
 order statuses
 order totals
 product snapshots inside orders
+Inventory reservation references inside order items
 ```
 
 Payment owns:
@@ -399,7 +428,15 @@ Ordering does not store live product data.
 
 Ordering stores product snapshots so old orders do not change when Catalog data changes.
 
+Frontend does not send trusted product prices, product names, SKUs or currencies to Ordering.
+
+Frontend does not choose warehouse or storage location.
+
+Ordering gets product snapshots from Catalog through Catalog API.
+
 Inventory stores stock by SKU.
+
+Inventory chooses warehouse and storage location during stock allocation.
 
 Ordering may reference Catalog data by `product_id`, `product_variant_id` and `sku`.
 
@@ -409,7 +446,7 @@ Ordering creates Inventory reservations when orders are created.
 
 Ordering releases Inventory reservations when orders are cancelled.
 
-Ordering commits Inventory reservations when orders are marked as Paid.
+Ordering currently commits Inventory reservations when orders are marked as Paid.
 
 Payment does not store order details.
 

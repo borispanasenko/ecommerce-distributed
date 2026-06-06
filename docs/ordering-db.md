@@ -23,7 +23,7 @@ Ordering Service does **not** own:
 * shipments;
 * customer accounts.
 
-Catalog Service owns product data.
+Catalog Service owns product data and current product prices.
 
 Inventory Service owns stock and reservations.
 
@@ -47,6 +47,9 @@ Other services may reference ordering data by `order_id`, but they must not read
 8. All order items in one order use the same currency.
 9. Tables use UUID primary keys.
 10. Orders have `created_at` and `updated_at`.
+11. Ordering gets trusted product snapshots from Catalog through Catalog API.
+12. Ordering asks Inventory to allocate stock reservations by SKU.
+13. Clients do not provide trusted product names, prices, SKUs or warehouse locations during checkout.
 
 ---
 
@@ -126,9 +129,10 @@ Represents one sellable item inside an order.
 Notes:
 
 * `product_id` and `product_variant_id` reference Catalog identities.
-* `sku` is copied from Catalog.
-* `product_name`, `variant_name`, `unit_price_amount_minor` and `currency` are snapshots.
+* `sku` is copied from Catalog product variant snapshot.
+* `product_name`, `variant_name`, `unit_price_amount_minor` and `currency` are snapshots loaded from Catalog.
 * `inventory_reservation_id` can reference an Inventory reservation.
+* Ordering stores only the Inventory reservation id, not Inventory stock state.
 
 Rules:
 
@@ -145,6 +149,8 @@ Rules:
 Order items store a copy of product data:
 
 ```text
+product_id
+product_variant_id
 sku
 product_name
 variant_name
@@ -156,18 +162,22 @@ Reason:
 
 ```text
 Catalog data can change later.
-Existing orders should keep the original product name and price.
+Existing orders should keep the original product name, variant name, SKU and price.
 ```
 
 Example:
 
 ```text
-Catalog product:
+Catalog product variant snapshot:
 Monitor Arm / Black / ARM-BLK / 6900 USD
 
 Order item snapshot:
 Monitor Arm / Black / ARM-BLK / 6900 USD
 ```
+
+Ordering gets this snapshot from Catalog Service when an order is created.
+
+Clients only send product variant ids and quantities during order creation.
 
 ---
 
@@ -176,6 +186,17 @@ Monitor Arm / Black / ARM-BLK / 6900 USD
 ```text
 orders 1 ─── * order_items
 ```
+
+External references:
+
+```text
+order_items.product_id         -> Catalog product identity
+order_items.product_variant_id -> Catalog product variant identity
+order_items.sku                -> Catalog SKU copied into order snapshot
+order_items.inventory_reservation_id -> Inventory reservation identity
+```
+
+These are cross-service references only. Ordering Service does not read or write `CatalogDb` or `InventoryDb` directly.
 
 ---
 
@@ -243,12 +264,25 @@ POST /api/orders/{id}/cancel
 POST /api/orders/{id}/mark-paid
 ```
 
+Current order creation request uses product variant ids and quantities:
+
+```text
+customer_name
+customer_email
+items:
+  product_variant_id
+  quantity
+```
+
 Current ordering flow:
 
 ```text
-Create order
-Reserve Inventory stock
+Create order from product variant ids and quantities
+Load product snapshots from Catalog Service
+Allocate Inventory stock reservations by SKU
 Store inventory_reservation_id on order item
+Calculate line totals
+Calculate order total
 List orders
 Get order details
 Cancel order
@@ -261,15 +295,21 @@ Current behavior:
 
 ```text
 Orders are created as PendingPayment.
-Creating an order reserves stock through Inventory Service.
+Create order requests contain product_variant_id and quantity.
+Ordering loads trusted product snapshot data from Catalog Service.
+Ordering does not trust client-provided product names, prices, SKUs or currencies.
+Ordering asks Inventory Service to allocate stock reservations by SKU.
+Inventory chooses the warehouse and storage location for allocated reservations.
 Order items store product snapshot data.
 Order items store inventory_reservation_id returned by Inventory Service.
-Line totals are calculated from unit price and quantity.
+Line totals are calculated from Catalog snapshot unit price and requested quantity.
 Order total is calculated as the sum of line totals.
 Orders with empty item lists are rejected.
-Orders with mixed item currencies are rejected.
-Orders without warehouse_id or location_id are rejected.
-If Inventory reservation fails, order creation is rejected.
+Orders with missing product_variant_id are rejected.
+Orders with invalid quantity are rejected.
+Orders with mixed Catalog snapshot currencies are rejected.
+If Catalog snapshot lookup fails, order creation is rejected.
+If Inventory allocation fails, order creation is rejected.
 If order persistence fails after reservation, Ordering tries to release created reservations.
 Only PendingPayment orders can be cancelled.
 Cancelling an order releases Inventory reservations.
@@ -287,7 +327,8 @@ Current tests:
 
 ```text
 Create order tests
-Inventory reservation integration tests
+Catalog snapshot integration tests
+Inventory allocation integration tests
 Order total calculation tests
 Validation tests
 Order list tests
@@ -301,8 +342,11 @@ Missing order tests
 Future work:
 
 ```text
+Move Inventory commit from payment success to fulfillment/shipment flow.
 Handle payment failure effects on order lifecycle.
 Add order event history.
 Add shipment flow.
 Add refund flow.
+Add customer identity and customer-specific order history.
+Add idempotency for order creation and cross-service operations.
 ```
