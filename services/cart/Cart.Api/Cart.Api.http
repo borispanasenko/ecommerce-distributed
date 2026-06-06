@@ -1,0 +1,106 @@
+### WARNING
+### This file changes local development data.
+### Requests are additive and may create carts and cart items.
+### Cart stores productVariantId and quantity only.
+### Cart does not store trusted product names, prices, SKUs or stock data.
+### Change runId before running the full flow again.
+
+@CartApi_HostAddress = http://localhost:5005
+@runId = 001
+
+@productVariantId = 9572fb9d-f059-401e-9041-7fc75f8cb414
+@secondProductVariantId = 40000000-0000-0000-0000-000000000003
+
+
+### Health check
+GET {{CartApi_HostAddress}}/health
+
+
+### Create cart
+# @name createCart
+POST {{CartApi_HostAddress}}/api/carts
+
+
+### Get created cart
+@cartId = {{createCart.response.body.$.id}}
+
+GET {{CartApi_HostAddress}}/api/carts/{{cartId}}
+
+
+### Add item to cart
+POST {{CartApi_HostAddress}}/api/carts/{{cartId}}/items
+Content-Type: application/json
+
+{
+  "productVariantId": "{{productVariantId}}",
+  "quantity": 2
+}
+
+
+### Add same item again should increase quantity
+POST {{CartApi_HostAddress}}/api/carts/{{cartId}}/items
+Content-Type: application/json
+
+{
+  "productVariantId": "{{productVariantId}}",
+  "quantity": 3
+}
+
+
+### Add second item to cart
+POST {{CartApi_HostAddress}}/api/carts/{{cartId}}/items
+Content-Type: application/json
+
+{
+  "productVariantId": "{{secondProductVariantId}}",
+  "quantity": 1
+}
+
+
+### Get cart with items
+GET {{CartApi_HostAddress}}/api/carts/{{cartId}}
+
+
+### Update item quantity
+PUT {{CartApi_HostAddress}}/api/carts/{{cartId}}/items/{{productVariantId}}
+Content-Type: application/json
+
+{
+  "quantity": 4
+}
+
+
+### Remove second item
+DELETE {{CartApi_HostAddress}}/api/carts/{{cartId}}/items/{{secondProductVariantId}}
+
+
+### Clear cart
+POST {{CartApi_HostAddress}}/api/carts/{{cartId}}/clear
+
+
+### Get cart after clear
+GET {{CartApi_HostAddress}}/api/carts/{{cartId}}
+
+
+### Create invalid item without product variant id should return 400
+POST {{CartApi_HostAddress}}/api/carts/{{cartId}}/items
+Content-Type: application/json
+
+{
+  "productVariantId": "00000000-0000-0000-0000-000000000000",
+  "quantity": 1
+}
+
+
+### Create invalid item with zero quantity should return 400
+POST {{CartApi_HostAddress}}/api/carts/{{cartId}}/items
+Content-Type: application/json
+
+{
+  "productVariantId": "{{productVariantId}}",
+  "quantity": 0
+}
+
+
+### Missing cart should return 404
+GET {{CartApi_HostAddress}}/api/carts/00000000-0000-0000-0000-000000000000

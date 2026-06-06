@@ -1,0 +1,17 @@
+### Safe read-only checks for Cart API.
+
+@CartApi_HostAddress = http://localhost:5005
+
+@cartId = 00000000-0000-0000-0000-000000000000
+
+
+### Health check
+GET {{CartApi_HostAddress}}/health
+
+
+### Get cart by id
+GET {{CartApi_HostAddress}}/api/carts/{{cartId}}
+
+
+### Missing cart should return 404
+GET {{CartApi_HostAddress}}/api/carts/00000000-0000-0000-0000-000000000000

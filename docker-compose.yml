@@ -68,6 +68,20 @@ services:
       ordering-api:
         condition: service_started
 
+  cart-api:
+    build:
+      context: .
+      dockerfile: services/cart/Cart.Api/Dockerfile
+    container_name: cart-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=cart-db;Port=5432;Database=cart_db;Username=postgres;Password=postgres
+    ports:
+      - "5005:8080"
+    depends_on:
+      cart-db:
+        condition: service_healthy
+
   catalog-db:
     image: postgres:16-alpine
     container_name: catalog-db
@@ -136,8 +150,26 @@ services:
       timeout: 5s
       retries: 5
 
+  cart-db:
+    image: postgres:16
+    container_name: cart-db
+    environment:
+      POSTGRES_DB: cart_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5437:5432"
+    volumes:
+      - cart-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cart_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   catalog-db-data:
   ordering-db-data:
   inventory-db-data:
   payment-db-data:
+  cart-db-data:
