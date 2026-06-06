@@ -25,6 +25,7 @@ Payment DB    - localhost:5436
 Inside Docker Compose, services use internal service names:
 
 ```text
+Ordering -> Catalog:   http://catalog-api:8080
 Ordering -> Inventory: http://inventory-api:8080
 Payment  -> Ordering:  http://ordering-api:8080
 ```
@@ -36,12 +37,15 @@ Payment  -> Ordering:  http://ordering-api:8080
 When running services directly with `dotnet run`, start them in this order:
 
 ```text
+Catalog API
 Inventory API
 Ordering API
 Payment API
 ```
 
-Catalog can be started independently.
+Ordering API requires Catalog API for product snapshots and Inventory API for stock reservations.
+
+Payment API requires Ordering API for successful payment flow.
 
 Catalog:
 
@@ -64,6 +68,7 @@ Ordering:
 ```bash
 ASPNETCORE_ENVIRONMENT=Development \
 ConnectionStrings__DefaultConnection="Host=localhost;Port=5434;Database=ordering_db;Username=postgres;Password=postgres" \
+CatalogApi__BaseUrl="http://localhost:5001" \
 InventoryApi__BaseUrl="http://localhost:5245" \
 dotnet run --project services/ordering/Ordering.Api/Ordering.Api.csproj
 ```
@@ -76,6 +81,8 @@ ConnectionStrings__DefaultConnection="Host=localhost;Port=5436;Database=payment_
 OrderingApi__BaseUrl="http://localhost:5172" \
 dotnet run --project services/payment/Payment.Api/Payment.Api.csproj
 ```
+
+If a service is started with a different local port from `launchSettings.json`, update the corresponding `CatalogApi__BaseUrl`, `InventoryApi__BaseUrl` or `OrderingApi__BaseUrl`.
 
 ---
 
@@ -98,3 +105,16 @@ Use *.Api.readonly.http files for safe read-only checks.
 ```
 
 Write `.http` files may change local development data, but flows are designed to finish in terminal states and avoid active dangling reservations.
+
+---
+
+## Current checkout backend flow
+
+```text
+Client sends productVariantId and quantity.
+Ordering loads product snapshot from Catalog.
+Ordering asks Inventory to allocate stock reservation by SKU.
+Ordering stores product snapshot and inventoryReservationId.
+Payment can mark the order as Paid.
+Ordering commits Inventory reservation when order is marked as Paid.
+```

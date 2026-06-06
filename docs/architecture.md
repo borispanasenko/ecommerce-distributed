@@ -3,9 +3,9 @@
 ## Services
 
 ```text
-Catalog   - product catalog data
-Inventory - stock and reservations
-Ordering  - orders and order lifecycle
+Catalog   - product catalog data, variants/SKUs and current prices
+Inventory - stock, reservations and stock allocation
+Ordering  - orders, order lifecycle and product snapshots inside orders
 Payment   - payment records and payment simulation
 Frontend  - Angular UI
 ```
@@ -15,9 +15,9 @@ Frontend  - Angular UI
 ## Service ownership
 
 ```text
-Catalog owns products, brands, categories, variants/SKUs and prices.
-Inventory owns warehouses, locations, stock balances, movements and reservations.
-Ordering owns orders, order items, order statuses and product snapshots.
+Catalog owns products, brands, categories, variants/SKUs and current prices.
+Inventory owns warehouses, locations, stock balances, movements, reservations and allocation.
+Ordering owns orders, order items, order statuses, order totals and product snapshots.
 Payment owns payments, payment statuses, provider references and failure reasons.
 ```
 
@@ -26,10 +26,11 @@ Payment owns payments, payment statuses, provider references and failure reasons
 ## Main backend flow
 
 ```text
-Catalog defines SKUs.
+Catalog defines product variants, SKUs and current prices.
 Inventory stores stock by SKU.
-Ordering creates orders from product snapshot data.
-Ordering reserves Inventory stock when an order is created.
+Ordering creates orders from product variant IDs and quantities.
+Ordering loads trusted product snapshots from Catalog.
+Ordering asks Inventory to allocate stock reservations by SKU.
 Payment stores payment records for orders.
 Payment calls Ordering when a pending payment succeeds.
 Ordering marks the order as Paid.
@@ -42,9 +43,24 @@ Ordering commits Inventory reservation when order is marked as Paid.
 
 ```text
 Order is created.
-Inventory stock is reserved.
+Ordering loads product snapshot from Catalog.
+Inventory stock reservation is allocated.
 Order is cancelled.
 Inventory reservation is released.
+```
+
+---
+
+## Payment success flow
+
+```text
+Order is created.
+Inventory stock reservation is allocated.
+Payment is created.
+Payment is marked as Succeeded.
+Payment calls Ordering to mark the order as Paid.
+Ordering marks the order as Paid.
+Ordering commits Inventory reservation.
 ```
 
 ---
@@ -60,14 +76,32 @@ Inventory reservation is not committed by Payment failure.
 
 ---
 
+## Current MVP simplification
+
+```text
+Payment success currently leads to Inventory reservation commit through Ordering.
+In a fuller commerce flow, Inventory commit should move closer to fulfillment/shipment.
+```
+
+---
+
 ## Boundary rules
 
 ```text
 Services own their own databases.
 Services must not read or write another service database directly.
 Cross-service operations go through APIs.
-Orders store product snapshots.
+
+Frontend does not send trusted product prices, product names, SKUs or currencies to Ordering.
+Frontend does not choose warehouse or storage location.
+
+Catalog owns current product data and prices.
+Ordering gets product snapshots from Catalog through Catalog API.
+Ordering stores product snapshots so old orders do not change when Catalog data changes.
+
 Inventory stores stock by SKU.
+Inventory chooses warehouse and storage location during stock allocation.
+
 Payments reference orders by order_id.
 Payment does not write OrderingDb directly.
 Payment does not write InventoryDb directly.
