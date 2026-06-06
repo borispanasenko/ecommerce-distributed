@@ -33,8 +33,6 @@ export type CreateOrderItemRequest = {
   unitPriceAmountMinor: number;
   currency: string;
   quantity: number;
-  warehouseId: string;
-  locationId: string;
 };
 
 export type CreateOrderRequest = {

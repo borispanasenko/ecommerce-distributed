@@ -26,6 +26,9 @@ export class OrderDetailsPageComponent {
   protected readonly isPaying = signal(false);
   protected readonly paymentErrorMessage = signal<string | null>(null);
 
+  protected readonly isCancelling = signal(false);
+  protected readonly cancelErrorMessage = signal<string | null>(null);
+
   protected readonly order$ = combineLatest([
     this.route.paramMap.pipe(
       map((params) => {
@@ -51,6 +54,10 @@ export class OrderDetailsPageComponent {
     if (order.status !== 'PendingPayment') {
       return;
     }
+
+    this.paymentErrorMessage.set(null);
+    this.cancelErrorMessage.set(null);
+    this.isPaying.set(true);
 
     this.paymentErrorMessage.set(null);
     this.isPaying.set(true);
@@ -79,6 +86,32 @@ export class OrderDetailsPageComponent {
       );
     } finally {
       this.isPaying.set(false);
+    }
+  }
+
+  protected async cancelOrder(order: OrderDetails): Promise<void> {
+    if (this.isCancelling()) {
+      return;
+    }
+
+    if (order.status !== 'PendingPayment') {
+      return;
+    }
+
+    this.paymentErrorMessage.set(null);
+    this.cancelErrorMessage.set(null);
+    this.isCancelling.set(true);
+
+    try {
+      await firstValueFrom(this.orderingApi.cancelOrder(order.id));
+      this.refreshOrder.next();
+    } catch (error) {
+      console.error('Cancel order failed', error);
+      this.cancelErrorMessage.set(
+        getHttpErrorMessage(error, 'Cancel order failed. Check Ordering and Inventory APIs.'),
+      );
+    } finally {
+      this.isCancelling.set(false);
     }
   }
 

@@ -178,6 +178,11 @@ button.primary {
   border-color: #111;
 }
 
+button.danger {
+  color: #991b1b;
+  border-color: #e5b8b8;
+}
+
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;

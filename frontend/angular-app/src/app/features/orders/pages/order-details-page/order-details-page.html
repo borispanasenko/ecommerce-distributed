@@ -1,5 +1,5 @@
 <section class="page">
-  <a routerLink="/listings" class="back-link">← Back to products</a>
+  <a routerLink="/listings" class="back-link">← Back to shopping</a>
 
   @if (order$ | async; as order) {
     <header class="page-header">
@@ -20,10 +20,19 @@
           <button
             type="button"
             class="primary"
-            [disabled]="isPaying()"
+            [disabled]="isPaying() || isCancelling()"
             (click)="payNow(order)"
           >
             {{ isPaying() ? 'Processing payment...' : 'Pay now' }}
+          </button>
+
+          <button
+            type="button"
+            class="danger"
+            [disabled]="isPaying() || isCancelling()"
+            (click)="cancelOrder(order)"
+          >
+            {{ isCancelling() ? 'Cancelling...' : 'Cancel order' }}
           </button>
         }
       </div>
@@ -31,6 +40,10 @@
 
     @if (paymentErrorMessage()) {
       <p class="error">{{ paymentErrorMessage() }}</p>
+    }
+
+    @if (cancelErrorMessage()) {
+      <p class="error">{{ cancelErrorMessage() }}</p>
     }
 
     <div class="layout">

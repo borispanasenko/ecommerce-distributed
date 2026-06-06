@@ -18,4 +18,8 @@ export class OrderingApi {
   createOrder(request: CreateOrderRequest): Observable<OrderDetails> {
     return this.http.post<OrderDetails>(`${API_BASE_URLS.ordering}/api/orders`, request);
   }
+
+  cancelOrder(orderId: string): Observable<OrderDetails> {
+    return this.http.post<OrderDetails>(`${API_BASE_URLS.ordering}/api/orders/${orderId}/cancel`, null);
+  }
 }

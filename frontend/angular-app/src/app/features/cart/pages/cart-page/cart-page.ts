@@ -7,7 +7,6 @@ import { firstValueFrom } from 'rxjs';
 import { OrderingApi } from '../../../orders/services/ordering-api';
 import { CartStore } from '../../services/cart-store';
 
-import { CHECKOUT_STOCK_LOCATION } from '../../../../core/services/checkout-config';
 import { getHttpErrorMessage } from '../../../../shared/utils/http-error-message';
 
 @Component({
@@ -94,8 +93,6 @@ export class CartPageComponent {
             unitPriceAmountMinor: item.unitPriceAmountMinor,
             currency: item.currency,
             quantity: item.quantity,
-            warehouseId: CHECKOUT_STOCK_LOCATION.warehouseId,
-            locationId: CHECKOUT_STOCK_LOCATION.locationId,
           })),
         }),
       );
