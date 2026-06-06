@@ -2,9 +2,10 @@
 ### This file changes local development data.
 ### Requests are additive and may create orders, payments, reservations and stock movements.
 ### Flows are designed to finish in terminal states and avoid active dangling reservations.
-### Creating an order through this file reserves Inventory stock.
+### Creating an order through this file loads product snapshots from Catalog and allocates Inventory stock.
 ### Succeeding a payment marks the order as Paid and commits Inventory reservation.
 ### Failed payment flow uses a fake order id to avoid Inventory side effects.
+### Ordering API must be running and configured through CatalogApi:BaseUrl and InventoryApi:BaseUrl.
 ### Change runId before running the full flow again.
 
 @PaymentApi_HostAddress = http://localhost:5206
@@ -13,8 +14,7 @@
 
 @runId = 001
 
-@warehouseId = 1a279d4c-ee02-4c86-bd4d-175f4098a709
-@locationId = 38a754af-e46e-4d4e-a014-a8dc68cda9fa
+@productVariantId = 9572fb9d-f059-401e-9041-7fc75f8cb414
 @sku = ARM-BLK
 
 
@@ -26,7 +26,7 @@ GET {{PaymentApi_HostAddress}}/health
 GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 
-### Create order and reserve Inventory stock
+### Create order and allocate Inventory stock
 # @name createOrder
 POST {{OrderingApi_HostAddress}}/api/orders
 Content-Type: application/json
@@ -36,16 +36,8 @@ Content-Type: application/json
   "customerEmail": "payment-flow-{{runId}}@example.com",
   "items": [
     {
-      "productId": "a301a968-7477-4db5-bafd-edfb3bd03675",
-      "productVariantId": "9572fb9d-f059-401e-9041-7fc75f8cb414",
-      "sku": "{{sku}}",
-      "productName": "Monitor Arm",
-      "variantName": "Black",
-      "unitPriceAmountMinor": 6900,
-      "currency": "USD",
-      "quantity": 2,
-      "warehouseId": "{{warehouseId}}",
-      "locationId": "{{locationId}}"
+      "productVariantId": "{{productVariantId}}",
+      "quantity": 2
     }
   ]
 }
