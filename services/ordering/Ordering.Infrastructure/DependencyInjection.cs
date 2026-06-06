@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Ordering.Infrastructure.Persistence;
 using Ordering.Application.Orders;
 using Ordering.Infrastructure.Orders;
+using Ordering.Application.Catalog;
+using Ordering.Infrastructure.Catalog;
 using Ordering.Application.Inventory;
 using Ordering.Infrastructure.Inventory;
 
@@ -37,6 +39,18 @@ public static class DependencyInjection
             throw new InvalidOperationException(
                 "Inventory API base URL 'InventoryApi:BaseUrl' is not configured.");
         }
+
+        services.AddHttpClient<ICatalogClient, HttpCatalogClient>(client =>
+        {
+            var baseUrl = configuration["CatalogApi:BaseUrl"];
+
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                throw new InvalidOperationException("CatalogApi:BaseUrl is not configured.");
+            }
+
+            client.BaseAddress = new Uri(baseUrl);
+        });
 
         services.AddHttpClient<IInventoryClient, HttpInventoryClient>(client =>
         {

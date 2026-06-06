@@ -3,6 +3,7 @@ using Ordering.Application.Orders;
 using Ordering.Domain.Orders;
 using Ordering.Infrastructure.Persistence;
 using Ordering.Application.Inventory;
+using Ordering.Application.Catalog;
 
 namespace Ordering.Infrastructure.Orders;
 
@@ -11,12 +12,16 @@ public sealed class EfOrderingService : IOrderingService
     private readonly OrderingDbContext _dbContext;
     private readonly IInventoryClient _inventoryClient;
 
+    private readonly ICatalogClient _catalogClient;
+
     public EfOrderingService(
         OrderingDbContext dbContext,
-        IInventoryClient inventoryClient)
+        IInventoryClient inventoryClient,
+        ICatalogClient catalogClient)
     {
         _dbContext = dbContext;
         _inventoryClient = inventoryClient;
+        _catalogClient = catalogClient;
     }
 
     public async Task<OrderingResult<OrderDetailsDto>> CreateOrderAsync(
@@ -44,50 +49,16 @@ public sealed class EfOrderingService : IOrderingService
                 "Order must contain at least one item.");
         }
 
-        var normalizedItems = new List<CreateOrderItemRequest>();
+        var normalizedItems = new List<ResolvedOrderItem>();
 
         foreach (var item in request.Items)
         {
-            if (item.ProductId == Guid.Empty)
-            {
-                return OrderingResult<OrderDetailsDto>.Failure(
-                    "product_id_required",
-                    "Product id is required.");
-            }
 
             if (item.ProductVariantId == Guid.Empty)
             {
                 return OrderingResult<OrderDetailsDto>.Failure(
                     "product_variant_id_required",
                     "Product variant id is required.");
-            }
-
-            if (string.IsNullOrWhiteSpace(item.Sku))
-            {
-                return OrderingResult<OrderDetailsDto>.Failure(
-                    "sku_required",
-                    "SKU is required.");
-            }
-
-            if (string.IsNullOrWhiteSpace(item.ProductName))
-            {
-                return OrderingResult<OrderDetailsDto>.Failure(
-                    "product_name_required",
-                    "Product name is required.");
-            }
-
-            if (string.IsNullOrWhiteSpace(item.VariantName))
-            {
-                return OrderingResult<OrderDetailsDto>.Failure(
-                    "variant_name_required",
-                    "Variant name is required.");
-            }
-
-            if (item.UnitPriceAmountMinor < 0)
-            {
-                return OrderingResult<OrderDetailsDto>.Failure(
-                    "unit_price_invalid",
-                    "Unit price cannot be negative.");
             }
 
             if (item.Quantity <= 0)
@@ -97,20 +68,42 @@ public sealed class EfOrderingService : IOrderingService
                     "Quantity must be greater than zero.");
             }
 
-            if (string.IsNullOrWhiteSpace(item.Currency) || item.Currency.Trim().Length != 3)
+            var snapshotResult = await _catalogClient.GetProductVariantSnapshotAsync(
+                item.ProductVariantId,
+                cancellationToken);
+
+            if (!snapshotResult.IsSuccess)
+            {
+                return OrderingResult<OrderDetailsDto>.Failure(
+                    snapshotResult.ErrorCode ?? "catalog_variant_snapshot_failed",
+                    snapshotResult.ErrorMessage ?? "Catalog product variant snapshot request failed.");
+            }
+
+            var snapshot = snapshotResult.Value!;
+
+            if (snapshot.PriceAmountMinor < 0)
+            {
+                return OrderingResult<OrderDetailsDto>.Failure(
+                    "unit_price_invalid",
+                    "Unit price cannot be negative.");
+            }
+
+            if (string.IsNullOrWhiteSpace(snapshot.Currency) || snapshot.Currency.Trim().Length != 3)
             {
                 return OrderingResult<OrderDetailsDto>.Failure(
                     "currency_invalid",
                     "Currency must be a 3-letter code.");
             }
 
-            normalizedItems.Add(item with
-            {
-                Sku = item.Sku.Trim().ToUpperInvariant(),
-                ProductName = item.ProductName.Trim(),
-                VariantName = item.VariantName.Trim(),
-                Currency = item.Currency.Trim().ToUpperInvariant()
-            });
+            normalizedItems.Add(new ResolvedOrderItem(
+                ProductId: snapshot.ProductId,
+                ProductVariantId: snapshot.ProductVariantId,
+                Sku: snapshot.Sku.Trim().ToUpperInvariant(),
+                ProductName: snapshot.ProductName.Trim(),
+                VariantName: snapshot.VariantName.Trim(),
+                UnitPriceAmountMinor: snapshot.PriceAmountMinor,
+                Currency: snapshot.Currency.Trim().ToUpperInvariant(),
+                Quantity: item.Quantity));
         }
 
         var currency = normalizedItems[0].Currency;
@@ -359,4 +352,14 @@ public sealed class EfOrderingService : IOrderingService
                     item.InventoryReservationId))
                 .ToList());
     }
+
+    private sealed record ResolvedOrderItem(
+        Guid ProductId,
+        Guid ProductVariantId,
+        string Sku,
+        string ProductName,
+        string VariantName,
+        long UnitPriceAmountMinor,
+        string Currency,
+        int Quantity);
 }

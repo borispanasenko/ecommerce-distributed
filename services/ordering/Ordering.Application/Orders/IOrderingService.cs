@@ -28,16 +28,8 @@ public sealed record CreateOrderRequest(
     IReadOnlyCollection<CreateOrderItemRequest> Items);
 
 public sealed record CreateOrderItemRequest(
-    Guid ProductId,
     Guid ProductVariantId,
-    string Sku,
-    string ProductName,
-    string VariantName,
-    long UnitPriceAmountMinor,
-    string Currency,
-    int Quantity,
-    Guid WarehouseId,
-    Guid LocationId);
+    int Quantity);
 
 public sealed record OrderListItemDto(
     Guid Id,

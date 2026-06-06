@@ -3,6 +3,8 @@ using Ordering.Application.Inventory;
 using Ordering.Application.Orders;
 using Ordering.Infrastructure.Orders;
 using Ordering.Infrastructure.Persistence;
+using Ordering.Application.Catalog;
+
 
 namespace Ordering.Tests.Orders;
 
@@ -43,25 +45,34 @@ public sealed class OrderingServiceTests
     public async Task CreateOrderAsync_ShouldCalculateLineTotalAndOrderTotal()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out _, out var catalogClient);
+
+        var armVariantId = Guid.NewGuid();
+        var lampVariantId = Guid.NewGuid();
+
+        catalogClient.QueueSnapshot(
+            productVariantId: armVariantId,
+            sku: "ARM-BLK",
+            productName: "Monitor Arm",
+            variantName: "Black",
+            priceAmountMinor: 6900,
+            currency: "USD");
+
+        catalogClient.QueueSnapshot(
+            productVariantId: lampVariantId,
+            sku: "LAMP-BLK",
+            productName: "Desk Lamp",
+            variantName: "Black",
+            priceAmountMinor: 4900,
+            currency: "USD");
 
         var result = await service.CreateOrderAsync(new CreateOrderRequest(
             CustomerName: "Test Customer",
             CustomerEmail: "test@example.com",
             Items:
             [
-                CreateOrderItem(
-                    sku: "ARM-BLK",
-                    productName: "Monitor Arm",
-                    variantName: "Black",
-                    unitPriceAmountMinor: 6900,
-                    quantity: 2),
-                CreateOrderItem(
-                    sku: "LAMP-BLK",
-                    productName: "Desk Lamp",
-                    variantName: "Black",
-                    unitPriceAmountMinor: 4900,
-                    quantity: 3)
+                CreateOrderItem(productVariantId: armVariantId, quantity: 2),
+                CreateOrderItem(productVariantId: lampVariantId, quantity: 3)
             ]));
 
         Assert.True(result.IsSuccess);
@@ -79,27 +90,27 @@ public sealed class OrderingServiceTests
     }
 
     [Fact]
-    public async Task CreateOrderAsync_ShouldNormalizeSkuAndCurrency()
+    public async Task CreateOrderAsync_ShouldNormalizeCatalogSnapshotValues()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out _, out var catalogClient);
+
+        var variantId = Guid.NewGuid();
+
+        catalogClient.QueueSnapshot(
+            productVariantId: variantId,
+            sku: " arm-blk ",
+            productName: " Monitor Arm ",
+            variantName: " Black ",
+            priceAmountMinor: 6900,
+            currency: " usd ");
 
         var result = await service.CreateOrderAsync(new CreateOrderRequest(
             CustomerName: "Test Customer",
             CustomerEmail: "test@example.com",
             Items:
             [
-                new CreateOrderItemRequest(
-                    ProductId: Guid.NewGuid(),
-                    ProductVariantId: Guid.NewGuid(),
-                    Sku: " arm-blk ",
-                    ProductName: " Monitor Arm ",
-                    VariantName: " Black ",
-                    UnitPriceAmountMinor: 6900,
-                    Currency: " usd ",
-                    Quantity: 1,
-                    WarehouseId: WarehouseId,
-                    LocationId: LocationId)
+                CreateOrderItem(productVariantId: variantId)
             ]));
 
         Assert.True(result.IsSuccess);
@@ -180,17 +191,19 @@ public sealed class OrderingServiceTests
     }
 
     [Fact]
-    public async Task CreateOrderAsync_ShouldRejectNegativeUnitPrice()
+    public async Task CreateOrderAsync_ShouldRejectNegativeUnitPriceFromCatalogSnapshot()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out _, out var catalogClient);
+
+        catalogClient.QueueSnapshot(priceAmountMinor: -1);
 
         var request = new CreateOrderRequest(
             CustomerName: "Test Customer",
             CustomerEmail: "test@example.com",
             Items:
             [
-                CreateOrderItem(unitPriceAmountMinor: -1)
+                CreateOrderItem()
             ]);
 
         var result = await service.CreateOrderAsync(request);
@@ -200,18 +213,31 @@ public sealed class OrderingServiceTests
     }
 
     [Fact]
-    public async Task CreateOrderAsync_ShouldRejectMixedCurrencies()
+    public async Task CreateOrderAsync_ShouldRejectMixedCurrenciesFromCatalogSnapshots()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out _, out var catalogClient);
+
+        var armVariantId = Guid.NewGuid();
+        var lampVariantId = Guid.NewGuid();
+
+        catalogClient.QueueSnapshot(
+            productVariantId: armVariantId,
+            sku: "ARM-BLK",
+            currency: "USD");
+
+        catalogClient.QueueSnapshot(
+            productVariantId: lampVariantId,
+            sku: "LAMP-BLK",
+            currency: "EUR");
 
         var request = new CreateOrderRequest(
             CustomerName: "Test Customer",
             CustomerEmail: "test@example.com",
             Items:
             [
-                CreateOrderItem(sku: "ARM-BLK", currency: "USD"),
-                CreateOrderItem(sku: "LAMP-BLK", currency: "EUR")
+                CreateOrderItem(productVariantId: armVariantId),
+                CreateOrderItem(productVariantId: lampVariantId)
             ]);
 
         var result = await service.CreateOrderAsync(request);
@@ -221,27 +247,24 @@ public sealed class OrderingServiceTests
     }
 
     [Fact]
-    public async Task CreateOrderAsync_ShouldNotRequireWarehouseOrLocation()
+    public async Task CreateOrderAsync_ShouldRejectOrder_WhenCatalogSnapshotFails()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out var inventoryClient);
+        var service = CreateService(dbContext, out var inventoryClient, out var catalogClient);
 
-        var result = await service.CreateOrderAsync(new CreateOrderRequest(
-            CustomerName: "Test Customer",
-            CustomerEmail: "test@example.com",
-            Items:
-            [
-                CreateOrderItem(
-                    warehouseId: Guid.Empty,
-                    locationId: Guid.Empty)
-            ]));
+        catalogClient.QueueFailure(
+            "catalog_variant_snapshot_not_found",
+            "Active product variant snapshot was not found.");
 
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Value);
+        var result = await service.CreateOrderAsync(CreateValidOrderRequest());
 
-        Assert.Single(inventoryClient.AllocateRequests);
-        Assert.Equal("ARM-BLK", inventoryClient.AllocateRequests[0].Sku);
-        Assert.Equal(1, inventoryClient.AllocateRequests[0].Quantity);
+        Assert.False(result.IsSuccess);
+        Assert.Equal("catalog_variant_snapshot_not_found", result.ErrorCode);
+        Assert.Empty(inventoryClient.AllocateRequests);
+
+        var orderCount = await dbContext.Orders.CountAsync();
+
+        Assert.Equal(0, orderCount);
     }
 
     [Fact]
@@ -439,9 +462,18 @@ public sealed class OrderingServiceTests
         OrderingDbContext dbContext,
         out FakeInventoryClient inventoryClient)
     {
-        inventoryClient = new FakeInventoryClient();
+        return CreateService(dbContext, out inventoryClient, out _);
+    }
 
-        return new EfOrderingService(dbContext, inventoryClient);
+    private static EfOrderingService CreateService(
+        OrderingDbContext dbContext,
+        out FakeInventoryClient inventoryClient,
+        out FakeCatalogClient catalogClient)
+    {
+        inventoryClient = new FakeInventoryClient();
+        catalogClient = new FakeCatalogClient();
+
+        return new EfOrderingService(dbContext, inventoryClient, catalogClient);
     }
 
     private static CreateOrderRequest CreateValidOrderRequest()
@@ -451,37 +483,17 @@ public sealed class OrderingServiceTests
             CustomerEmail: "test@example.com",
             Items:
             [
-                CreateOrderItem(
-                    sku: "ARM-BLK",
-                    productName: "Monitor Arm",
-                    variantName: "Black",
-                    unitPriceAmountMinor: 6900,
-                    currency: "USD",
-                    quantity: 2)
+                CreateOrderItem(quantity: 2)
             ]);
     }
 
     private static CreateOrderItemRequest CreateOrderItem(
-        string sku = "ARM-BLK",
-        string productName = "Monitor Arm",
-        string variantName = "Black",
-        long unitPriceAmountMinor = 6900,
-        string currency = "USD",
-        int quantity = 1,
-        Guid? warehouseId = null,
-        Guid? locationId = null)
+        Guid? productVariantId = null,
+        int quantity = 1)
     {
         return new CreateOrderItemRequest(
-            ProductId: Guid.NewGuid(),
-            ProductVariantId: Guid.NewGuid(),
-            Sku: sku,
-            ProductName: productName,
-            VariantName: variantName,
-            UnitPriceAmountMinor: unitPriceAmountMinor,
-            Currency: currency,
-            Quantity: quantity,
-            WarehouseId: warehouseId ?? WarehouseId,
-            LocationId: locationId ?? LocationId);
+            ProductVariantId: productVariantId ?? Guid.NewGuid(),
+            Quantity: quantity);
     }
 
     private static OrderingDbContext CreateDbContext()
@@ -575,6 +587,66 @@ public sealed class OrderingServiceTests
 
             return Task.FromResult(
                 InventoryClientResult<InventoryReservationDto>.Success(reservation));
+        }
+    }
+
+    private sealed class FakeCatalogClient : ICatalogClient
+    {
+        private readonly Queue<Func<Guid, CatalogClientResult<ProductVariantSnapshotDto>>> _snapshotResults = [];
+
+        public List<Guid> SnapshotRequests { get; } = [];
+
+        public void QueueSnapshot(
+            Guid? productId = null,
+            Guid? productVariantId = null,
+            string sku = "ARM-BLK",
+            string productName = "Monitor Arm",
+            string variantName = "Black",
+            long priceAmountMinor = 6900,
+            string currency = "USD")
+        {
+            _snapshotResults.Enqueue(requestedProductVariantId =>
+                CatalogClientResult<ProductVariantSnapshotDto>.Success(
+                    new ProductVariantSnapshotDto(
+                        ProductId: productId ?? Guid.NewGuid(),
+                        ProductVariantId: productVariantId ?? requestedProductVariantId,
+                        Sku: sku,
+                        ProductName: productName,
+                        VariantName: variantName,
+                        PriceAmountMinor: priceAmountMinor,
+                        Currency: currency)));
+        }
+
+        public void QueueFailure(string errorCode, string errorMessage)
+        {
+            _snapshotResults.Enqueue(_ =>
+                CatalogClientResult<ProductVariantSnapshotDto>.Failure(
+                    errorCode,
+                    errorMessage));
+        }
+
+        public Task<CatalogClientResult<ProductVariantSnapshotDto>> GetProductVariantSnapshotAsync(
+            Guid productVariantId,
+            CancellationToken cancellationToken = default)
+        {
+            SnapshotRequests.Add(productVariantId);
+
+            if (_snapshotResults.Count > 0)
+            {
+                return Task.FromResult(_snapshotResults.Dequeue()(productVariantId));
+            }
+
+            var snapshot = new ProductVariantSnapshotDto(
+                ProductId: Guid.NewGuid(),
+                ProductVariantId: productVariantId,
+                Sku: "ARM-BLK",
+                ProductName: "Monitor Arm",
+                VariantName: "Black",
+                PriceAmountMinor: 6900,
+                Currency: "USD");
+
+            return Task.FromResult(
+                CatalogClientResult<ProductVariantSnapshotDto>.Success(snapshot));
         }
     }
 }
