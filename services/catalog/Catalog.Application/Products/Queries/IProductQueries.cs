@@ -8,4 +8,8 @@ public interface IProductQueries
     Task<ProductDetailsDto?> GetProductByIdAsync(
         Guid productId,
         CancellationToken cancellationToken = default);
+
+    Task<ProductVariantSnapshotDto?> GetProductVariantSnapshotAsync(
+        Guid productVariantId,
+        CancellationToken cancellationToken = default);
 }

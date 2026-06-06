@@ -124,6 +124,113 @@ public sealed class ProductQueriesTests
         Assert.Empty(products);
     }
 
+    [Fact]
+    public async Task GetProductVariantSnapshotAsync_ShouldReturnActiveProductVariantSnapshot()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var commandService = new EfProductCommandService(dbContext);
+        var queries = new EfProductQueries(dbContext);
+
+        var productResult = await commandService.CreateProductAsync(new CreateProductRequest(
+            BrandId: null,
+            Name: "Monitor Arm",
+            Slug: "monitor-arm",
+            Description: "Adjustable monitor arm.",
+            CategoryIds: Array.Empty<Guid>()));
+
+        var variantResult = await commandService.AddVariantAsync(
+            productResult.Value!.Id,
+            new AddProductVariantRequest(
+                Sku: "arm-blk",
+                Name: "Black",
+                PriceAmountMinor: 6900,
+                Currency: "usd"));
+
+        await commandService.PublishProductAsync(productResult.Value.Id);
+
+        var snapshot = await queries.GetProductVariantSnapshotAsync(variantResult.Value!.Id);
+
+        Assert.NotNull(snapshot);
+        Assert.Equal(productResult.Value.Id, snapshot.ProductId);
+        Assert.Equal(variantResult.Value.Id, snapshot.ProductVariantId);
+        Assert.Equal("ARM-BLK", snapshot.Sku);
+        Assert.Equal("Monitor Arm", snapshot.ProductName);
+        Assert.Equal("Black", snapshot.VariantName);
+        Assert.Equal(6900, snapshot.PriceAmountMinor);
+        Assert.Equal("USD", snapshot.Currency);
+    }
+
+    [Fact]
+    public async Task GetProductVariantSnapshotAsync_ShouldReturnNull_WhenVariantDoesNotExist()
+    {
+        await using var dbContext = CreateDbContext();
+        var queries = new EfProductQueries(dbContext);
+
+        var snapshot = await queries.GetProductVariantSnapshotAsync(Guid.NewGuid());
+
+        Assert.Null(snapshot);
+    }
+
+    [Fact]
+    public async Task GetProductVariantSnapshotAsync_ShouldReturnNull_WhenProductIsDraft()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var commandService = new EfProductCommandService(dbContext);
+        var queries = new EfProductQueries(dbContext);
+
+        var productResult = await commandService.CreateProductAsync(new CreateProductRequest(
+            BrandId: null,
+            Name: "Draft Product",
+            Slug: "draft-product",
+            Description: null,
+            CategoryIds: Array.Empty<Guid>()));
+
+        var variantResult = await commandService.AddVariantAsync(
+            productResult.Value!.Id,
+            new AddProductVariantRequest(
+                Sku: "DRAFT-SKU",
+                Name: "Default",
+                PriceAmountMinor: 1000,
+                Currency: "USD"));
+
+        var snapshot = await queries.GetProductVariantSnapshotAsync(variantResult.Value!.Id);
+
+        Assert.Null(snapshot);
+    }
+
+    [Fact]
+    public async Task GetProductVariantSnapshotAsync_ShouldReturnNull_WhenProductIsArchived()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var commandService = new EfProductCommandService(dbContext);
+        var queries = new EfProductQueries(dbContext);
+
+        var productResult = await commandService.CreateProductAsync(new CreateProductRequest(
+            BrandId: null,
+            Name: "Archived Product",
+            Slug: "archived-product",
+            Description: null,
+            CategoryIds: Array.Empty<Guid>()));
+
+        var variantResult = await commandService.AddVariantAsync(
+            productResult.Value!.Id,
+            new AddProductVariantRequest(
+                Sku: "ARCH-SKU",
+                Name: "Default",
+                PriceAmountMinor: 1000,
+                Currency: "USD"));
+
+        await commandService.PublishProductAsync(productResult.Value.Id);
+        await commandService.ArchiveProductAsync(productResult.Value.Id);
+
+        var snapshot = await queries.GetProductVariantSnapshotAsync(variantResult.Value!.Id);
+
+        Assert.Null(snapshot);
+    }
+   
     private static CatalogDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<CatalogDbContext>()

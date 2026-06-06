@@ -118,4 +118,40 @@ public sealed class EfProductQueries : IProductQueries
                     VariantId: image.VariantId))
                 .ToList());
     }
+
+    public async Task<ProductVariantSnapshotDto?> GetProductVariantSnapshotAsync(
+        Guid productVariantId,
+        CancellationToken cancellationToken = default)
+    {
+        var product = await _dbContext.Products
+            .AsNoTracking()
+            .Include(product => product.Variants)
+            .Where(product => product.Status == ProductStatus.Active)
+            .FirstOrDefaultAsync(
+                product => product.Variants.Any(variant => variant.Id == productVariantId),
+                cancellationToken);
+
+        if (product is null)
+        {
+            return null;
+        }
+
+        var variant = product.Variants.FirstOrDefault(variant =>
+            variant.Id == productVariantId &&
+            variant.IsActive);
+
+        if (variant is null)
+        {
+            return null;
+        }
+
+        return new ProductVariantSnapshotDto(
+            ProductId: product.Id,
+            ProductVariantId: variant.Id,
+            Sku: variant.Sku,
+            ProductName: product.Name,
+            VariantName: variant.Name,
+            PriceAmountMinor: variant.PriceAmountMinor,
+            Currency: variant.Currency);
+    }
 }
