@@ -23,12 +23,15 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: Host=ordering-db;Port=5432;Database=ordering_db;Username=postgres;Password=postgres
+      CatalogApi__BaseUrl: http://catalog-api:8080
       InventoryApi__BaseUrl: http://inventory-api:8080
     ports:
       - "5002:8080"
     depends_on:
       ordering-db:
         condition: service_healthy
+      catalog-api:
+        condition: service_started
       inventory-api:
         condition: service_started
 
