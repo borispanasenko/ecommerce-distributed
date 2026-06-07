@@ -1,6 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
+import { CatalogApi } from '../../listings/services/catalog-api';
 import { BackendCart } from '../models/backend-cart';
 import { AddCartItem, CartItem } from '../models/cart-item';
 import { CartApi } from './cart-api';
@@ -10,6 +11,7 @@ import { CartApi } from './cart-api';
 })
 export class CartStore {
   private readonly cartApi = inject(CartApi);
+  private readonly catalogApi = inject(CatalogApi);
 
   private readonly cartIdStorageKey = 'marketflow.cartId';
   private readonly displayItemsStorageKey = 'marketflow.cartItems';
@@ -50,7 +52,9 @@ export class CartStore {
   }
 
   async incrementItem(productVariantId: string): Promise<void> {
-    const item = this.itemsSignal().find((cartItem) => cartItem.productVariantId === productVariantId);
+    const item = this.itemsSignal().find(
+      (cartItem) => cartItem.productVariantId === productVariantId,
+    );
 
     if (!item) {
       return;
@@ -60,7 +64,9 @@ export class CartStore {
   }
 
   async decrementItem(productVariantId: string): Promise<void> {
-    const item = this.itemsSignal().find((cartItem) => cartItem.productVariantId === productVariantId);
+    const item = this.itemsSignal().find(
+      (cartItem) => cartItem.productVariantId === productVariantId,
+    );
 
     if (!item) {
       return;
@@ -181,7 +187,7 @@ export class CartStore {
         productId: snapshot?.productId ?? '',
         productVariantId: backendItem.productVariantId,
         sku: snapshot?.sku ?? backendItem.productVariantId,
-        productName: snapshot?.productName ?? 'Product variant',
+        productName: snapshot?.productName ?? 'Loading product...',
         variantName: snapshot?.variantName ?? backendItem.productVariantId,
         unitPriceAmountMinor: snapshot?.unitPriceAmountMinor ?? 0,
         currency: snapshot?.currency ?? 'USD',
@@ -192,6 +198,46 @@ export class CartStore {
     this.itemsSignal.set(displayItems);
     this.persistCartId();
     this.persistItems();
+
+    void this.enrichMissingDisplayItems();
+  }
+
+  private async enrichMissingDisplayItems(): Promise<void> {
+    const itemsNeedingEnrichment = this.itemsSignal().filter(
+      (item) => !item.productId || item.unitPriceAmountMinor === 0,
+    );
+
+    if (itemsNeedingEnrichment.length === 0) {
+      return;
+    }
+
+    for (const item of itemsNeedingEnrichment) {
+      try {
+        const snapshot = await firstValueFrom(
+          this.catalogApi.getProductVariantSnapshot(item.productVariantId),
+        );
+
+        this.itemsSignal.update((items) =>
+          items.map((currentItem) =>
+            currentItem.productVariantId === item.productVariantId
+              ? {
+                  ...currentItem,
+                  productId: snapshot.productId,
+                  sku: snapshot.sku,
+                  productName: snapshot.productName,
+                  variantName: snapshot.variantName,
+                  unitPriceAmountMinor: snapshot.priceAmountMinor,
+                  currency: snapshot.currency,
+                }
+              : currentItem,
+          ),
+        );
+
+        this.persistItems();
+      } catch (error) {
+        console.warn('Failed to enrich cart item from Catalog', error);
+      }
+    }
   }
 
   private loadLocalState(): void {

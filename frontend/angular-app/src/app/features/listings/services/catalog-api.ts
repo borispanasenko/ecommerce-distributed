@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 
 import { API_BASE_URLS } from '../../../core/services/api-config';
 import { CatalogProduct, CatalogProductDetails } from '../models/catalog-product';
+import { ProductVariantSnapshot } from '../models/product-variant-snapshot';
 
 @Injectable({
   providedIn: 'root',
@@ -17,5 +18,11 @@ export class CatalogApi {
 
   getProductById(productId: string): Observable<CatalogProductDetails> {
     return this.http.get<CatalogProductDetails>(`${API_BASE_URLS.catalog}/api/products/${productId}`);
+  }
+
+  getProductVariantSnapshot(productVariantId: string): Observable<ProductVariantSnapshot> {
+    return this.http.get<ProductVariantSnapshot>(
+      `http://localhost:5001/api/products/variants/${productVariantId}/snapshot`,
+    );
   }
 }
