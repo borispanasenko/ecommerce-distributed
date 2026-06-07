@@ -22,16 +22,35 @@
           </div>
 
           <div class="quantity">
-            <button type="button" (click)="cartStore.decrementItem(item.productVariantId)">−</button>
+            <button
+              type="button"
+              [disabled]="isCartActionPending() || isSubmitting()"
+              (click)="decrementItem(item.productVariantId)"
+            >
+              −
+            </button>
+
             <span>{{ item.quantity }}</span>
-            <button type="button" (click)="cartStore.incrementItem(item.productVariantId)">+</button>
+
+            <button
+              type="button"
+              [disabled]="isCartActionPending() || isSubmitting()"
+              (click)="incrementItem(item.productVariantId)"
+            >
+              +
+            </button>
           </div>
 
           <div class="line-total">
             {{ formatPrice(getLineTotalAmountMinor(item.unitPriceAmountMinor, item.quantity), item.currency) }}
           </div>
 
-          <button type="button" class="danger" (click)="cartStore.removeItem(item.productVariantId)">
+          <button
+            type="button"
+            class="danger"
+            [disabled]="isCartActionPending() || isSubmitting()"
+            (click)="removeItem(item.productVariantId)"
+          >
             Remove
           </button>
         </article>
@@ -79,7 +98,7 @@
         <button
           type="button"
           class="primary"
-          [disabled]="isSubmitting()"
+          [disabled]="isSubmitting() || isCartActionPending()"
           (click)="checkout()"
         >
           {{ isSubmitting() ? 'Creating order...' : 'Checkout' }}

@@ -26,6 +26,7 @@ export class CartPageComponent {
   protected customerEmail = '';
 
   protected readonly isSubmitting = signal(false);
+  protected readonly isCartActionPending = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
 
   protected formatPrice(priceAmountMinor: number, currency: string): string {
@@ -48,6 +49,39 @@ export class CartPageComponent {
 
   protected getCartCurrency(): string {
     return this.cartStore.items()[0]?.currency ?? 'USD';
+  }
+
+  protected async incrementItem(productVariantId: string): Promise<void> {
+    await this.runCartAction(() => this.cartStore.incrementItem(productVariantId));
+  }
+
+  protected async decrementItem(productVariantId: string): Promise<void> {
+    await this.runCartAction(() => this.cartStore.decrementItem(productVariantId));
+  }
+
+  protected async removeItem(productVariantId: string): Promise<void> {
+    await this.runCartAction(() => this.cartStore.removeItem(productVariantId));
+  }
+
+  private async runCartAction(action: () => Promise<void>): Promise<void> {
+    if (this.isCartActionPending() || this.isSubmitting()) {
+      return;
+    }
+
+    this.errorMessage.set(null);
+    this.isCartActionPending.set(true);
+
+    try {
+      await action();
+    } catch (error) {
+      console.error('Cart action failed', error);
+      this.errorMessage.set(getHttpErrorMessage(
+        error,
+        'Cart update failed. Check Cart API.',
+      ));
+    } finally {
+      this.isCartActionPending.set(false);
+    }
   }
 
   protected async checkout(): Promise<void> {
