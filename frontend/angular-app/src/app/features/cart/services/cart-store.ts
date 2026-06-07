@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -39,16 +40,35 @@ export class CartStore {
       return;
     }
 
-    const cartId = await this.ensureCart();
+    try {
+      const cartId = await this.ensureCart();
 
-    const backendCart = await firstValueFrom(
-      this.cartApi.addItem(cartId, {
-        productVariantId: itemToAdd.productVariantId,
-        quantity,
-      }),
-    );
+      const backendCart = await firstValueFrom(
+        this.cartApi.addItem(cartId, {
+          productVariantId: itemToAdd.productVariantId,
+          quantity,
+        }),
+      );
 
-    this.applyBackendCart(backendCart, [itemToAdd]);
+      this.applyBackendCart(backendCart, [itemToAdd]);
+    } catch (error) {
+      if (!this.isCartNotFoundError(error)) {
+        throw error;
+      }
+
+      this.clearLocalCartState();
+
+      const cartId = await this.ensureCart();
+
+      const backendCart = await firstValueFrom(
+        this.cartApi.addItem(cartId, {
+          productVariantId: itemToAdd.productVariantId,
+          quantity,
+        }),
+      );
+
+      this.applyBackendCart(backendCart, [itemToAdd]);
+    }
   }
 
   async incrementItem(productVariantId: string): Promise<void> {
@@ -88,13 +108,22 @@ export class CartStore {
 
     const cartId = await this.ensureCart();
 
-    const backendCart = await firstValueFrom(
-      this.cartApi.updateItem(cartId, productVariantId, {
-        quantity,
-      }),
-    );
+    try {
+      const backendCart = await firstValueFrom(
+        this.cartApi.updateItem(cartId, productVariantId, {
+          quantity,
+        }),
+      );
 
-    this.applyBackendCart(backendCart);
+      this.applyBackendCart(backendCart);
+    } catch (error) {
+      if (this.isCartNotFoundError(error)) {
+        this.clearLocalCartState();
+        return;
+      }
+
+      throw error;
+    }
   }
 
   async removeItem(productVariantId: string): Promise<void> {
@@ -108,20 +137,38 @@ export class CartStore {
       return;
     }
 
-    const backendCart = await firstValueFrom(
-      this.cartApi.removeItem(cartId, productVariantId),
-    );
+    try {
+      const backendCart = await firstValueFrom(
+        this.cartApi.removeItem(cartId, productVariantId),
+      );
 
-    this.applyBackendCart(backendCart);
+      this.applyBackendCart(backendCart);
+    } catch (error) {
+      if (this.isCartNotFoundError(error)) {
+        this.clearLocalCartState();
+        return;
+      }
+
+      throw error;
+    }
   }
 
   async clear(): Promise<void> {
     const cartId = this.cartIdSignal();
 
     if (cartId) {
-      const backendCart = await firstValueFrom(this.cartApi.clearCart(cartId));
-      this.applyBackendCart(backendCart);
-      return;
+      try {
+        const backendCart = await firstValueFrom(this.cartApi.clearCart(cartId));
+        this.applyBackendCart(backendCart);
+        return;
+      } catch (error) {
+        if (this.isCartNotFoundError(error)) {
+          this.clearLocalCartState();
+          return;
+        }
+
+        throw error;
+      }
     }
 
     this.itemsSignal.set([]);
@@ -139,6 +186,11 @@ export class CartStore {
       const backendCart = await firstValueFrom(this.cartApi.getCartById(cartId));
       this.applyBackendCart(backendCart);
     } catch (error) {
+      if (this.isCartNotFoundError(error)) {
+        this.clearLocalCartState();
+        return;
+      }
+
       console.warn('Failed to refresh cart from backend', error);
     }
   }
@@ -302,5 +354,27 @@ export class CartStore {
     } catch {
       return null;
     }
+  }
+
+  private clearLocalCartState(): void {
+    this.cartIdSignal.set(null);
+    this.itemsSignal.set([]);
+
+    const storage = this.getStorage();
+
+    if (!storage) {
+      return;
+    }
+
+    storage.removeItem(this.cartIdStorageKey);
+    storage.removeItem(this.displayItemsStorageKey);
+  }
+
+  private isCartNotFoundError(error: unknown): boolean {
+    return (
+      error instanceof HttpErrorResponse &&
+      error.status === 404 &&
+      error.error?.error === 'cart_not_found'
+    );
   }
 }
