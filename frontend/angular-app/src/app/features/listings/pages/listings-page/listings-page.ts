@@ -31,14 +31,14 @@ export class ListingsPageComponent {
     return product.variants.find((variant) => variant.isActive) ?? product.variants[0] ?? null;
   }
 
-  protected addFirstVariantToCart(product: CatalogProduct): void {
+  protected async addFirstVariantToCart(product: CatalogProduct): Promise<void> {
     const variant = this.getFirstActiveVariant(product);
 
     if (!variant) {
       return;
     }
 
-    this.cartStore.addItem({
+    await this.cartStore.addItem({
       productId: product.id,
       productVariantId: variant.id,
       sku: variant.sku,

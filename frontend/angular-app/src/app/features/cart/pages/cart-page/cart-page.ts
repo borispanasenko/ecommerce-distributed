@@ -52,7 +52,7 @@ export class CartPageComponent {
 
   protected async checkout(): Promise<void> {
     if (this.isSubmitting()) {
-    return;
+      return;
   }
 
     this.errorMessage.set(null);
@@ -91,7 +91,7 @@ export class CartPageComponent {
         }),
       );
 
-      this.cartStore.clear();
+      await this.cartStore.clear();
 
       await this.router.navigate(['/orders', order.id]);
     } catch (error) {
