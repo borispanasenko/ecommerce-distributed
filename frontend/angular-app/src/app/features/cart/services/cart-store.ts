@@ -175,7 +175,7 @@ export class CartStore {
     this.persistItems();
   }
 
-  async refreshFromBackend(): Promise<void> {
+  async refreshFromBackend(options: { throwOnFailure?: boolean } = {}): Promise<void> {
     const cartId = this.cartIdSignal();
 
     if (!cartId) {
@@ -189,6 +189,10 @@ export class CartStore {
       if (this.isCartNotFoundError(error)) {
         this.clearLocalCartState();
         return;
+      }
+
+      if (options.throwOnFailure) {
+        throw error;
       }
 
       console.warn('Failed to refresh cart from backend', error);

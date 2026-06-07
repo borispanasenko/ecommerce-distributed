@@ -53,38 +53,47 @@ export class CartPageComponent {
   protected async checkout(): Promise<void> {
     if (this.isSubmitting()) {
       return;
-  }
+    }
 
     this.errorMessage.set(null);
 
     const customerName = this.customerName.trim();
     const customerEmail = this.customerEmail.trim();
 
-    if (this.cartStore.items().length === 0) {
-      this.errorMessage.set('Cart is empty.');
-      return;
-    }
-
     if (!customerName || !customerEmail) {
       this.errorMessage.set('Customer name and email are required.');
       return;
     }
 
-    const currencies = new Set(this.cartStore.items().map((item) => item.currency));
-
-    if (currencies.size > 1) {
-      this.errorMessage.set('Cart items must use the same currency.');
+    if (this.cartStore.items().length === 0) {
+      this.errorMessage.set('Cart is empty.');
       return;
     }
 
     this.isSubmitting.set(true);
 
     try {
+      await this.cartStore.refreshFromBackend({ throwOnFailure: true });
+
+      const cartItems = this.cartStore.items();
+
+      if (cartItems.length === 0) {
+        this.errorMessage.set('Cart is empty.');
+        return;
+      }
+
+      const currencies = new Set(cartItems.map((item) => item.currency));
+
+      if (currencies.size > 1) {
+        this.errorMessage.set('Cart items must use the same currency.');
+        return;
+      }
+
       const order = await firstValueFrom(
         this.orderingApi.createOrder({
           customerName,
           customerEmail,
-          items: this.cartStore.items().map((item) => ({
+          items: cartItems.map((item) => ({
             productVariantId: item.productVariantId,
             quantity: item.quantity,
           })),
@@ -97,8 +106,9 @@ export class CartPageComponent {
     } catch (error) {
       console.error('Checkout failed', error);
       this.errorMessage.set(getHttpErrorMessage(
-        error, 'Checkout failed. Check Inventory stock and Ordering API.'),
-      );
+        error,
+        'Checkout failed. Check Cart, Inventory stock and Ordering API.',
+      ));
     } finally {
       this.isSubmitting.set(false);
     }
