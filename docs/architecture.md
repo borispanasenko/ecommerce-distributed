@@ -5,6 +5,7 @@
 ```text
 Catalog   - product catalog data, variants/SKUs and current prices
 Inventory - stock, reservations and stock allocation
+Cart      - shopping carts and cart items
 Ordering  - orders, order lifecycle and product snapshots inside orders
 Payment   - payment records and payment simulation
 Frontend  - Angular UI
@@ -17,6 +18,7 @@ Frontend  - Angular UI
 ```text
 Catalog owns products, brands, categories, variants/SKUs and current prices.
 Inventory owns warehouses, locations, stock balances, movements, reservations and allocation.
+Cart owns carts, cart items, product variant references and quantities.
 Ordering owns orders, order items, order statuses, order totals and product snapshots.
 Payment owns payments, payment statuses, provider references and failure reasons.
 ```
@@ -28,6 +30,7 @@ Payment owns payments, payment statuses, provider references and failure reasons
 ```text
 Catalog defines product variants, SKUs and current prices.
 Inventory stores stock by SKU.
+Cart stores product variant IDs and quantities before checkout.
 Ordering creates orders from product variant IDs and quantities.
 Ordering loads trusted product snapshots from Catalog.
 Ordering asks Inventory to allocate stock reservations by SKU.
@@ -35,6 +38,20 @@ Payment stores payment records for orders.
 Payment calls Ordering when a pending payment succeeds.
 Ordering marks the order as Paid.
 Ordering commits Inventory reservation when order is marked as Paid.
+```
+
+---
+
+## Cart flow
+
+```text
+Cart is created.
+Product variant is added to Cart with quantity.
+Cart item quantity can be updated.
+Cart item can be removed.
+Cart can be cleared.
+Cart does not reserve stock.
+Cart does not store trusted product prices, names, SKUs or currencies.
 ```
 
 ---
@@ -94,6 +111,12 @@ Cross-service operations go through APIs.
 
 Frontend does not send trusted product prices, product names, SKUs or currencies to Ordering.
 Frontend does not choose warehouse or storage location.
+
+Cart stores productVariantId and quantity only.
+Cart does not store trusted product prices, product names, SKUs, currencies or stock data.
+Cart does not reserve stock.
+Cart does not create orders.
+Cart does not process payments.
 
 Catalog owns current product data and prices.
 Ordering gets product snapshots from Catalog through Catalog API.

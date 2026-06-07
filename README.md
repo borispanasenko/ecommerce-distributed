@@ -7,6 +7,7 @@ Small distributed commerce system.
 ```text
 catalog   - products, brands, categories, variants/SKUs and current prices
 inventory - warehouses, locations, stock, reservations and stock allocation
+cart      - shopping carts and cart items
 ordering  - orders, product snapshots and inventory reservation references
 payment   - payment records and payment simulation
 frontend  - Angular UI
@@ -17,9 +18,10 @@ frontend  - Angular UI
 ```text
 Catalog   - working backend flow, API, tests, documentation
 Inventory - working backend flow, API, tests, documentation
+Cart      - working backend flow, API, tests, Docker Compose integration
 Ordering  - working backend flow, Catalog and Inventory integration, API, tests, documentation
 Payment   - working backend flow, Ordering integration, API, tests, documentation
-Frontend  - working catalog browsing, cart, checkout and payment flow
+Frontend  - working catalog browsing, client-side cart, checkout and payment flow
 ```
 
 ## Catalog flow
@@ -91,6 +93,33 @@ POST /api/stock/reservations/{id}/release
 POST /api/stock/reservations/{id}/commit
 ```
 
+## Cart flow
+
+```text
+Create cart
+Get cart details
+Add product variant to cart
+Increase quantity when adding the same product variant again
+Update cart item quantity
+Remove cart item
+Clear cart
+```
+
+## Cart API
+
+```text
+GET    /health
+
+POST   /api/carts
+GET    /api/carts/{id}
+
+POST   /api/carts/{id}/items
+PUT    /api/carts/{id}/items/{productVariantId}
+DELETE /api/carts/{id}/items/{productVariantId}
+
+POST   /api/carts/{id}/clear
+```
+
 ## Ordering flow
 
 ```text
@@ -150,6 +179,7 @@ POST /api/payments/{id}/fail
 ```text
 Catalog defines product variants, SKUs and current prices.
 Inventory stores stock by SKU.
+Cart stores product variant IDs and quantities before checkout.
 Ordering creates orders from product variant IDs and quantities.
 Ordering loads trusted product snapshots from Catalog.
 Ordering asks Inventory to allocate stock reservations by SKU.
@@ -168,6 +198,18 @@ In a fuller commerce flow, Inventory commit should move closer to fulfillment/sh
 ```
 
 Completed scenarios:
+
+```text
+Cart flow:
+Cart is created
+Product variant is added to Cart with quantity
+Adding the same product variant again increases quantity
+Cart item quantity can be updated
+Cart item can be removed
+Cart can be cleared
+Cart does not reserve Inventory stock
+Cart does not store trusted product names, prices, SKUs or currencies
+```
 
 ```text
 Cancel flow:
@@ -221,6 +263,7 @@ Catalog API   - http://localhost:5001
 Ordering API  - http://localhost:5002
 Inventory API - http://localhost:5003
 Payment API   - http://localhost:5004
+Cart API      - http://localhost:5005
 ```
 
 Inside Docker Compose, services use internal service names:
@@ -230,6 +273,8 @@ Ordering -> Catalog:   http://catalog-api:8080
 Ordering -> Inventory: http://inventory-api:8080
 Payment  -> Ordering:  http://ordering-api:8080
 ```
+
+Cart Service is currently independent from other backend services.
 
 Catalog database from host:
 
@@ -255,6 +300,12 @@ Payment database from host:
 Host=localhost;Port=5436;Database=payment_db;Username=postgres;Password=postgres
 ```
 
+Cart database from host:
+
+```text
+Host=localhost;Port=5437;Database=cart_db;Username=postgres;Password=postgres
+```
+
 ## Run Catalog API locally
 
 ```bash
@@ -269,6 +320,16 @@ dotnet run --project services/catalog/Catalog.Api/Catalog.Api.csproj
 ASPNETCORE_ENVIRONMENT=Development \
 ConnectionStrings__DefaultConnection="Host=localhost;Port=5435;Database=inventory_db;Username=postgres;Password=postgres" \
 dotnet run --project services/inventory/Inventory.Api/Inventory.Api.csproj
+```
+
+## Run Cart API locally
+
+Cart API can be started independently.
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development \
+ConnectionStrings__DefaultConnection="Host=localhost;Port=5437;Database=cart_db;Username=postgres;Password=postgres" \
+dotnet run --project services/cart/Cart.Api/Cart.Api.csproj
 ```
 
 ## Run Ordering API locally
@@ -316,6 +377,12 @@ Inventory:
 dotnet test services/inventory/Inventory.sln
 ```
 
+Cart:
+
+```bash
+dotnet test services/cart/Cart.sln
+```
+
 Ordering:
 
 ```bash
@@ -342,6 +409,13 @@ Inventory:
 ```text
 services/inventory/Inventory.Api/Inventory.Api.http
 services/inventory/Inventory.Api/Inventory.Api.readonly.http
+```
+
+Cart:
+
+```text
+services/cart/Cart.Api/Cart.Api.http
+services/cart/Cart.Api/Cart.Api.readonly.http
 ```
 
 Ordering:
@@ -398,6 +472,15 @@ stock reservations
 stock allocation
 ```
 
+Cart owns:
+
+```text
+carts
+cart items
+product variant references
+quantities
+```
+
 Ordering owns:
 
 ```text
@@ -423,6 +506,16 @@ payment failure reasons
 Catalog does not store stock.
 
 Inventory does not store product descriptions or prices.
+
+Cart stores productVariantId and quantity only.
+
+Cart does not store trusted product prices, product names, SKUs, currencies or stock data.
+
+Cart does not reserve stock.
+
+Cart does not create orders.
+
+Cart does not process payments.
 
 Ordering does not store live product data.
 
@@ -457,3 +550,7 @@ Payment calls Ordering when a pending payment succeeds.
 Payment does not write OrderingDb directly.
 
 Payment does not write InventoryDb directly.
+
+Inventory still allocates stock reservations during order creation, not during cart changes.
+
+Ordering still loads trusted product snapshots from Catalog when creating an order.

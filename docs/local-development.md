@@ -15,11 +15,13 @@ Catalog API   - http://localhost:5001
 Ordering API  - http://localhost:5002
 Inventory API - http://localhost:5003
 Payment API   - http://localhost:5004
+Cart API      - http://localhost:5005
 
 Catalog DB    - localhost:5433
 Ordering DB   - localhost:5434
 Inventory DB  - localhost:5435
 Payment DB    - localhost:5436
+Cart DB       - localhost:5437
 ```
 
 Inside Docker Compose, services use internal service names:
@@ -30,6 +32,8 @@ Ordering -> Inventory: http://inventory-api:8080
 Payment  -> Ordering:  http://ordering-api:8080
 ```
 
+Cart Service is currently independent from other backend services.
+
 ---
 
 ## Run services with dotnet
@@ -39,9 +43,12 @@ When running services directly with `dotnet run`, start them in this order:
 ```text
 Catalog API
 Inventory API
+Cart API
 Ordering API
 Payment API
 ```
+
+Cart API can be started independently.
 
 Ordering API requires Catalog API for product snapshots and Inventory API for stock reservations.
 
@@ -61,6 +68,14 @@ Inventory:
 ASPNETCORE_ENVIRONMENT=Development \
 ConnectionStrings__DefaultConnection="Host=localhost;Port=5435;Database=inventory_db;Username=postgres;Password=postgres" \
 dotnet run --project services/inventory/Inventory.Api/Inventory.Api.csproj
+```
+
+Cart:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development \
+ConnectionStrings__DefaultConnection="Host=localhost;Port=5437;Database=cart_db;Username=postgres;Password=postgres" \
+dotnet run --project services/cart/Cart.Api/Cart.Api.csproj
 ```
 
 Ordering:
@@ -91,6 +106,7 @@ If a service is started with a different local port from `launchSettings.json`, 
 ```bash
 dotnet test services/catalog/Catalog.sln
 dotnet test services/inventory/Inventory.sln
+dotnet test services/cart/Cart.sln
 dotnet test services/ordering/Ordering.sln
 dotnet test services/payment/Payment.sln
 ```
@@ -105,6 +121,27 @@ Use *.Api.readonly.http files for safe read-only checks.
 ```
 
 Write `.http` files may change local development data, but flows are designed to finish in terminal states and avoid active dangling reservations.
+
+Cart manual checks:
+
+```text
+services/cart/Cart.Api/Cart.Api.http
+services/cart/Cart.Api/Cart.Api.readonly.http
+```
+
+---
+
+## Current cart backend flow
+
+```text
+Client creates a cart.
+Client adds productVariantId and quantity to the cart.
+Client can update cart item quantity.
+Client can remove cart items.
+Client can clear the cart.
+Cart stores productVariantId and quantity only.
+Cart does not store trusted product names, prices, SKUs, currencies or stock data.
+```
 
 ---
 
