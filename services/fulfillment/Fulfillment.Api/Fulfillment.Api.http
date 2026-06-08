@@ -1,0 +1,135 @@
+### WARNING
+### This file changes local development data.
+### Requests are additive and may create shipments.
+### Shipping a shipment calls Ordering and marks the linked order as Shipped.
+### Current MVP behavior: Inventory reservation is already committed by Ordering mark-paid.
+### Ordering API must be running and configured through OrderingApi:BaseUrl.
+### Change runId before running the full flow again.
+
+@FulfillmentApi_HostAddress = http://localhost:5006
+@OrderingApi_HostAddress = http://localhost:5002
+@CatalogApi_HostAddress = http://localhost:5001
+@InventoryApi_HostAddress = http://localhost:5003
+
+@runId = 001
+@productVariantId = 9572fb9d-f059-401e-9041-7fc75f8cb414
+@sku = ARM-BLK
+
+
+### Health check
+GET {{FulfillmentApi_HostAddress}}/health
+
+
+### Create paid order for shipment flow
+# @name createOrderForShipment
+POST {{OrderingApi_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Shipment Flow Customer {{runId}}",
+  "customerEmail": "shipment-flow-{{runId}}@example.com",
+  "items": [
+    {
+      "productVariantId": "{{productVariantId}}",
+      "quantity": 1
+    }
+  ]
+}
+
+
+### Mark order as paid
+@orderId = {{createOrderForShipment.response.body.$.id}}
+
+POST {{OrderingApi_HostAddress}}/api/orders/{{orderId}}/mark-paid
+
+
+### Create shipment for paid order
+# @name createShipment
+POST {{FulfillmentApi_HostAddress}}/api/shipments
+Content-Type: application/json
+
+{
+  "orderId": "{{orderId}}",
+  "carrier": "Manual",
+  "trackingNumber": "TRACK-{{runId}}"
+}
+
+
+### Get created shipment
+@shipmentId = {{createShipment.response.body.$.id}}
+
+GET {{FulfillmentApi_HostAddress}}/api/shipments/{{shipmentId}}
+
+
+### Ship shipment and mark order as shipped
+POST {{FulfillmentApi_HostAddress}}/api/shipments/{{shipmentId}}/ship
+Content-Type: application/json
+
+{
+  "carrier": "Manual",
+  "trackingNumber": "TRACK-SHIPPED-{{runId}}"
+}
+
+
+### Get shipment after ship
+GET {{FulfillmentApi_HostAddress}}/api/shipments/{{shipmentId}}
+
+
+### Get order after shipment shipped
+GET {{OrderingApi_HostAddress}}/api/orders/{{orderId}}
+
+
+### Check Inventory stock after shipment shipped
+### Current MVP behavior: stock should not change here because mark-paid already committed reservation.
+GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
+
+
+### Ship already shipped shipment should return 400
+POST {{FulfillmentApi_HostAddress}}/api/shipments/{{shipmentId}}/ship
+Content-Type: application/json
+
+{
+  "carrier": "Manual",
+  "trackingNumber": "TRACK-RETRY-{{runId}}"
+}
+
+
+### Create shipment for cancel flow
+# @name createShipmentForCancel
+POST {{FulfillmentApi_HostAddress}}/api/shipments
+Content-Type: application/json
+
+{
+  "orderId": "00000000-0000-0000-0000-000000000001",
+  "carrier": "Manual",
+  "trackingNumber": "TRACK-CANCEL-{{runId}}"
+}
+
+
+### Cancel pending shipment
+@shipmentToCancelId = {{createShipmentForCancel.response.body.$.id}}
+
+POST {{FulfillmentApi_HostAddress}}/api/shipments/{{shipmentToCancelId}}/cancel
+
+
+### Get cancelled shipment
+GET {{FulfillmentApi_HostAddress}}/api/shipments/{{shipmentToCancelId}}
+
+
+### Create invalid shipment without order id should return 400
+POST {{FulfillmentApi_HostAddress}}/api/shipments
+Content-Type: application/json
+
+{
+  "orderId": "00000000-0000-0000-0000-000000000000",
+  "carrier": "Manual",
+  "trackingNumber": "TRACK-INVALID"
+}
+
+
+### Missing shipment should return 404
+GET {{FulfillmentApi_HostAddress}}/api/shipments/00000000-0000-0000-0000-000000000000
+
+
+### List shipments
+GET {{FulfillmentApi_HostAddress}}/api/shipments

@@ -82,6 +82,23 @@ services:
       cart-db:
         condition: service_healthy
 
+  fulfillment-api:
+    build:
+      context: .
+      dockerfile: services/fulfillment/Fulfillment.Api/Dockerfile
+    container_name: fulfillment-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=fulfillment-db;Port=5432;Database=fulfillment_db;Username=postgres;Password=postgres
+      OrderingApi__BaseUrl: http://ordering-api:8080
+    ports:
+      - "5006:8080"
+    depends_on:
+      fulfillment-db:
+        condition: service_healthy
+      ordering-api:
+        condition: service_started
+
   catalog-db:
     image: postgres:16-alpine
     container_name: catalog-db
@@ -167,9 +184,27 @@ services:
       timeout: 5s
       retries: 10
 
+  fulfillment-db:
+    image: postgres:16
+    container_name: fulfillment-db
+    environment:
+      POSTGRES_DB: fulfillment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5438:5432"
+    volumes:
+      - fulfillment-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fulfillment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   catalog-db-data:
   ordering-db-data:
   inventory-db-data:
+  fulfillment-db-data:
   payment-db-data:
   cart-db-data:
