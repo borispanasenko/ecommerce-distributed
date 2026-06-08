@@ -20,6 +20,10 @@ public interface IOrderingService
     Task<OrderingResult<OrderDetailsDto>> MarkOrderPaidAsync(
         Guid orderId,
         CancellationToken cancellationToken = default);
+
+    Task<OrderingResult<OrderDetailsDto>> MarkOrderShippedAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record CreateOrderRequest(

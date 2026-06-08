@@ -325,6 +325,36 @@ public sealed class EfOrderingService : IOrderingService
         return OrderingResult<OrderDetailsDto>.Success(ToDetailsDto(order));
     }
 
+    public async Task<OrderingResult<OrderDetailsDto>> MarkOrderShippedAsync(
+    Guid orderId,
+    CancellationToken cancellationToken = default)
+    {
+        var order = await _dbContext.Orders
+            .Include(order => order.Items)
+            .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
+
+        if (order is null)
+        {
+            return OrderingResult<OrderDetailsDto>.Failure(
+                "order_not_found",
+                "Order was not found.");
+        }
+
+        if (order.Status != OrderStatus.Paid)
+        {
+            return OrderingResult<OrderDetailsDto>.Failure(
+                "order_cannot_be_marked_shipped",
+                "Only paid orders can be marked as shipped.");
+        }
+
+        order.Status = OrderStatus.Shipped;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return OrderingResult<OrderDetailsDto>.Success(ToDetailsDto(order));
+    }
+
     private static OrderDetailsDto ToDetailsDto(Order order)
     {
         return new OrderDetailsDto(

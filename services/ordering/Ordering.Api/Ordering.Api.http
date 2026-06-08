@@ -5,6 +5,7 @@
 ### Creating an order loads product snapshots from Catalog and allocates Inventory stock.
 ### Cancelling an order releases Inventory reservation.
 ### Marking an order as paid commits Inventory reservation.
+### Marking a paid order as shipped changes order status only in the current MVP.
 ### Catalog API must be running and configured through CatalogApi:BaseUrl.
 ### Inventory API must be running and configured through InventoryApi:BaseUrl.
 ### Change runId before running the full flow again.
@@ -68,7 +69,7 @@ GET {{OrderingApi_HostAddress}}/api/orders/{{orderToCancelId}}
 GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 
-### Create order for direct mark-paid flow
+### Create order for direct paid-to-shipped flow
 # @name createOrderForPaid
 POST {{OrderingApi_HostAddress}}/api/orders
 Content-Type: application/json
@@ -105,6 +106,29 @@ GET {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}
 
 ### Check Inventory stock after mark-paid
 GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
+
+
+### Mark paid order as shipped
+### Current MVP behavior: this updates order status only.
+### Inventory reservation was already committed by mark-paid.
+POST {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}/mark-shipped
+
+
+### Get order details after mark-shipped
+GET {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}
+
+
+### Check Inventory stock after mark-shipped
+### Current MVP behavior: stock should not change here.
+GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
+
+
+### Mark already shipped order as shipped again should return 400
+POST {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}/mark-shipped
+
+
+### Cancel shipped order should return 400
+POST {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}/cancel
 
 
 ### List orders after flow

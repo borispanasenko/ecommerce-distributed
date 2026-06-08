@@ -458,6 +458,54 @@ public sealed class OrderingServiceTests
         Assert.Equal("order_cannot_be_marked_paid", secondResult.ErrorCode);
     }
 
+    [Fact]
+    public async Task MarkOrderShippedAsync_ShouldMarkPaidOrderAsShipped()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var paidResult = await service.MarkOrderPaidAsync(createdOrder.Value!.Id);
+        var shippedResult = await service.MarkOrderShippedAsync(createdOrder.Value.Id);
+
+        Assert.True(paidResult.IsSuccess);
+        Assert.True(shippedResult.IsSuccess);
+        Assert.NotNull(shippedResult.Value);
+        Assert.Equal("Shipped", shippedResult.Value.Status);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Shipped", order.Status);
+    }
+
+    [Fact]
+    public async Task MarkOrderShippedAsync_ShouldRejectMissingOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+
+        var result = await service.MarkOrderShippedAsync(Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("order_not_found", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task MarkOrderShippedAsync_ShouldRejectPendingPaymentOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var result = await service.MarkOrderShippedAsync(createdOrder.Value!.Id);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("order_cannot_be_marked_shipped", result.ErrorCode);
+    }
+
     private static EfOrderingService CreateService(
         OrderingDbContext dbContext,
         out FakeInventoryClient inventoryClient)

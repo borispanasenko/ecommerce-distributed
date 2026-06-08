@@ -104,6 +104,27 @@ public static class OrderingEndpoints
         .WithName("MarkOrderPaid")
         .WithOpenApi();
 
+        orders.MapPost("/{orderId:guid}/mark-shipped", async (
+            Guid orderId,
+            IOrderingService orderingService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await orderingService.MarkOrderShippedAsync(orderId, cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new
+                {
+                    error = result.ErrorCode,
+                    message = result.ErrorMessage
+                });
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .WithName("MarkOrderShipped")
+        .WithOpenApi();
+
         return app;
     }
 }
