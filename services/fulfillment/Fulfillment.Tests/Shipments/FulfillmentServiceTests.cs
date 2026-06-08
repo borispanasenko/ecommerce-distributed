@@ -47,6 +47,51 @@ public sealed class FulfillmentServiceTests
     }
 
     [Fact]
+    public async Task CreateShipmentAsync_ShouldRejectMissingOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var orderingClient);
+
+        orderingClient.NextGetOrderResult =
+            OrderingClientResult<OrderingOrderDto>.Failure(
+                "order_not_found",
+                "Order was not found.");
+
+        var result = await service.CreateShipmentAsync(new CreateShipmentRequest(
+            OrderId: Guid.NewGuid(),
+            Carrier: "Manual",
+            TrackingNumber: "TRACK-001"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("order_not_found", result.ErrorCode);
+
+        var shipmentCount = await dbContext.Shipments.CountAsync();
+
+        Assert.Equal(0, shipmentCount);
+    }
+
+    [Fact]
+    public async Task CreateShipmentAsync_ShouldRejectUnpaidOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var orderingClient);
+
+        orderingClient.DefaultOrderStatus = "PendingPayment";
+
+        var result = await service.CreateShipmentAsync(new CreateShipmentRequest(
+            OrderId: Guid.NewGuid(),
+            Carrier: "Manual",
+            TrackingNumber: "TRACK-001"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("order_not_ready_for_shipment", result.ErrorCode);
+
+        var shipmentCount = await dbContext.Shipments.CountAsync();
+
+        Assert.Equal(0, shipmentCount);
+    }
+
+    [Fact]
     public async Task GetShipmentsAsync_ShouldReturnShipments()
     {
         await using var dbContext = CreateDbContext();
@@ -154,7 +199,7 @@ public sealed class FulfillmentServiceTests
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext, out var orderingClient);
 
-        orderingClient.NextResult = OrderingClientResult.Failure(
+        orderingClient.NextMarkShippedResult = OrderingClientResult.Failure(
             "order_cannot_be_marked_shipped",
             "Only paid orders can be marked as shipped.");
 
@@ -237,9 +282,37 @@ public sealed class FulfillmentServiceTests
 
     private sealed class FakeOrderingClient : IOrderingClient
     {
+        public List<Guid> GetOrderRequests { get; } = [];
+
         public List<Guid> MarkShippedRequests { get; } = [];
 
-        public OrderingClientResult? NextResult { get; set; }
+        public OrderingClientResult<OrderingOrderDto>? NextGetOrderResult { get; set; }
+
+        public OrderingClientResult? NextMarkShippedResult { get; set; }
+
+        public string DefaultOrderStatus { get; set; } = "Paid";
+
+        public Task<OrderingClientResult<OrderingOrderDto>> GetOrderByIdAsync(
+            Guid orderId,
+            CancellationToken cancellationToken = default)
+        {
+            GetOrderRequests.Add(orderId);
+
+            if (NextGetOrderResult is not null)
+            {
+                var result = NextGetOrderResult;
+                NextGetOrderResult = null;
+
+                return Task.FromResult(result);
+            }
+
+            var order = new OrderingOrderDto(
+                Id: orderId,
+                Status: DefaultOrderStatus);
+
+            return Task.FromResult(
+                OrderingClientResult<OrderingOrderDto>.Success(order));
+        }
 
         public Task<OrderingClientResult> MarkOrderShippedAsync(
             Guid orderId,
@@ -247,10 +320,10 @@ public sealed class FulfillmentServiceTests
         {
             MarkShippedRequests.Add(orderId);
 
-            if (NextResult is not null)
+            if (NextMarkShippedResult is not null)
             {
-                var result = NextResult;
-                NextResult = null;
+                var result = NextMarkShippedResult;
+                NextMarkShippedResult = null;
 
                 return Task.FromResult(result);
             }

@@ -30,6 +30,24 @@ public sealed class EfFulfillmentService : IFulfillmentService
                 "Order id is required.");
         }
 
+        var orderResult = await _orderingClient.GetOrderByIdAsync(
+            request.OrderId,
+            cancellationToken);
+
+        if (!orderResult.IsSuccess)
+        {
+            return FulfillmentResult<ShipmentDetailsDto>.Failure(
+                orderResult.ErrorCode ?? "ordering_get_order_failed",
+                orderResult.ErrorMessage ?? "Ordering get-order request failed.");
+        }
+
+        if (!string.Equals(orderResult.Value!.Status, "Paid", StringComparison.Ordinal))
+        {
+            return FulfillmentResult<ShipmentDetailsDto>.Failure(
+                "order_not_ready_for_shipment",
+                "Only paid orders can have shipments.");
+        }
+
         var now = DateTimeOffset.UtcNow;
 
         var shipment = new Shipment
