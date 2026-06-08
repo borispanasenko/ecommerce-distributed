@@ -29,6 +29,8 @@ Inventory Service owns stock and reservations.
 
 Payment Service owns payments.
 
+Fulfillment Service owns shipments.
+
 Ordering Service stores product snapshots so existing orders do not change when Catalog data changes.
 
 Other services may reference ordering data by `order_id`, but they must not read or write `OrderingDb` directly.
@@ -41,15 +43,17 @@ Other services may reference ordering data by `order_id`, but they must not read
 2. Catalog owns product descriptions, variants and current prices.
 3. Inventory owns stock and reservations.
 4. Payment owns payment state.
-5. Order items store product snapshots.
-6. Orders store totals in minor units to avoid decimal precision issues.
-7. One order can contain multiple order items.
-8. All order items in one order use the same currency.
-9. Tables use UUID primary keys.
-10. Orders have `created_at` and `updated_at`.
-11. Ordering gets trusted product snapshots from Catalog through Catalog API.
-12. Ordering asks Inventory to allocate stock reservations by SKU.
-13. Clients do not provide trusted product names, prices, SKUs or warehouse locations during checkout.
+5. Fulfillment owns shipment lifecycle.
+6. Order items store product snapshots.
+7. Orders store totals in minor units to avoid decimal precision issues.
+8. One order can contain multiple order items.
+9. All order items in one order use the same currency.
+10. Tables use UUID primary keys.
+11. Orders have `created_at` and `updated_at`.
+12. Ordering gets trusted product snapshots from Catalog through Catalog API.
+13. Ordering asks Inventory to allocate stock reservations by SKU.
+14. Clients do not provide trusted product names, prices, SKUs or warehouse locations during checkout.
+15. Fulfillment calls Ordering to mark paid orders as shipped.
 
 ---
 
@@ -86,6 +90,7 @@ Current implemented statuses:
 PendingPayment
 Paid
 Cancelled
+Shipped
 ```
 
 Notes:
@@ -93,6 +98,7 @@ Notes:
 * Orders are currently created as `PendingPayment`.
 * Orders can be cancelled while they are in `PendingPayment`.
 * Orders can be marked as `Paid` while they are in `PendingPayment`.
+* Orders can be marked as `Shipped` while they are in `Paid`.
 * `total_amount_minor` stores money in minor units.
 * Example: `13800` means `138.00`.
 
@@ -101,6 +107,7 @@ Rules:
 * Order must contain at least one item.
 * Only `PendingPayment` orders can be cancelled.
 * Only `PendingPayment` orders can be marked as `Paid`.
+* Only `Paid` orders can be marked as `Shipped`.
 * `total_amount_minor` must be greater than or equal to `0`.
 * `currency` must have `3` characters.
 * All order items must use the same currency.
@@ -190,13 +197,17 @@ orders 1 ─── * order_items
 External references:
 
 ```text
-order_items.product_id         -> Catalog product identity
-order_items.product_variant_id -> Catalog product variant identity
-order_items.sku                -> Catalog SKU copied into order snapshot
-order_items.inventory_reservation_id -> Inventory reservation identity
+order_items.product_id                 -> Catalog product identity
+order_items.product_variant_id         -> Catalog product variant identity
+order_items.sku                        -> Catalog SKU copied into order snapshot
+order_items.inventory_reservation_id   -> Inventory reservation identity
+orders.id                              -> referenced by Payment as order_id
+orders.id                              -> referenced by Fulfillment as order_id
 ```
 
-These are cross-service references only. Ordering Service does not read or write `CatalogDb` or `InventoryDb` directly.
+These are cross-service references only.
+
+Ordering Service does not read or write `CatalogDb`, `InventoryDb`, `PaymentDb` or `FulfillmentDb` directly.
 
 ---
 
@@ -246,7 +257,8 @@ The following are intentionally excluded:
 * order event log;
 * direct reads from CatalogDb;
 * direct reads from InventoryDb;
-* direct reads from PaymentDb.
+* direct reads from PaymentDb;
+* direct reads from FulfillmentDb.
 
 These may be added later only if there is a clear business reason.
 
@@ -262,6 +274,7 @@ GET  /api/orders/{id}
 POST /api/orders
 POST /api/orders/{id}/cancel
 POST /api/orders/{id}/mark-paid
+POST /api/orders/{id}/mark-shipped
 ```
 
 Current order creation request uses product variant ids and quantities:
@@ -289,6 +302,7 @@ Cancel order
 Release Inventory reservation
 Mark order as Paid
 Commit Inventory reservation
+Mark paid order as Shipped
 ```
 
 Current behavior:
@@ -318,9 +332,23 @@ Only PendingPayment orders can be marked as Paid.
 Marking an order as Paid commits Inventory reservations.
 Paid orders cannot be cancelled.
 Paid orders cannot be marked as Paid again.
+Only Paid orders can be marked as Shipped.
+Marking an order as Shipped changes order status only in the current MVP.
+Shipped orders cannot be cancelled.
+Shipped orders cannot be marked as Paid again.
+Shipped orders cannot be marked as Shipped again.
 Payment Service calls Ordering to mark orders as Paid when a pending payment succeeds.
+Fulfillment Service calls Ordering to mark orders as Shipped when shipments are shipped.
 GET /api/orders returns order summaries.
 GET /api/orders/{id} returns order details.
+```
+
+Current MVP simplification:
+
+```text
+Ordering currently commits Inventory reservations when orders are marked as Paid.
+Fulfillment currently marks paid orders as Shipped through Ordering.
+In a fuller commerce flow, Inventory commit should move closer to fulfillment/shipment.
 ```
 
 Current tests:
@@ -335,6 +363,7 @@ Order list tests
 Order details tests
 Cancel order tests
 Mark paid tests
+Mark shipped tests
 Inventory reservation commit tests
 Missing order tests
 ```
@@ -345,7 +374,7 @@ Future work:
 Move Inventory commit from payment success to fulfillment/shipment flow.
 Handle payment failure effects on order lifecycle.
 Add order event history.
-Add shipment flow.
+Add richer shipment integration.
 Add refund flow.
 Add customer identity and customer-specific order history.
 Add idempotency for order creation and cross-service operations.

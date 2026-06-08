@@ -5,23 +5,25 @@ Small distributed commerce system.
 ## Services
 
 ```text
-catalog   - products, brands, categories, variants/SKUs and current prices
-inventory - warehouses, locations, stock, reservations and stock allocation
-cart      - shopping carts and cart items
-ordering  - orders, product snapshots and inventory reservation references
-payment   - payment records and payment simulation
-frontend  - Angular UI
+catalog     - products, brands, categories, variants/SKUs and current prices
+inventory   - warehouses, locations, stock, reservations and stock allocation
+cart        - shopping carts and cart items
+ordering    - orders, product snapshots and inventory reservation references
+payment     - payment records and payment simulation
+fulfillment - shipments and shipment lifecycle
+frontend    - Angular UI
 ```
 
 ## Current status
 
 ```text
-Catalog   - working backend flow, API, tests, documentation
-Inventory - working backend flow, API, tests, documentation
-Cart      - working backend flow, API, tests, Docker Compose integration
-Ordering  - working backend flow, Catalog and Inventory integration, API, tests, documentation
-Payment   - working backend flow, Ordering integration, API, tests, documentation
-Frontend  - working catalog browsing, client-side cart, checkout and payment flow
+Catalog     - working backend flow, API, tests, documentation, Docker Compose integration
+Inventory   - working backend flow, API, tests, documentation, Docker Compose integration
+Cart        - working backend flow, API, tests, documentation, Docker Compose integration, frontend integration
+Ordering    - working backend flow, Catalog and Inventory integration, API, tests, documentation, Docker Compose integration
+Payment     - working backend flow, Ordering integration, API, tests, documentation, Docker Compose integration
+Fulfillment - working backend flow, Ordering integration, API, tests, documentation, Docker Compose integration
+Frontend    - working catalog browsing, backend cart integration, checkout and payment flow
 ```
 
 ## Catalog flow
@@ -135,6 +137,7 @@ Cancel order
 Release Inventory reservation
 Mark order as Paid
 Commit Inventory reservation
+Mark paid order as Shipped
 ```
 
 ## Ordering API
@@ -147,6 +150,7 @@ GET  /api/orders/{id}
 POST /api/orders
 POST /api/orders/{id}/cancel
 POST /api/orders/{id}/mark-paid
+POST /api/orders/{id}/mark-shipped
 ```
 
 ## Payment flow
@@ -174,6 +178,30 @@ POST /api/payments/{id}/succeed
 POST /api/payments/{id}/fail
 ```
 
+## Fulfillment flow
+
+```text
+Create shipment for order
+List shipments
+Get shipment details
+Ship shipment
+Mark linked order as Shipped through Ordering
+Cancel pending shipment
+Reject shipment changes after terminal status
+```
+
+## Fulfillment API
+
+```text
+GET  /health
+
+GET  /api/shipments
+GET  /api/shipments/{id}
+POST /api/shipments
+POST /api/shipments/{id}/ship
+POST /api/shipments/{id}/cancel
+```
+
 ## End-to-end flows
 
 ```text
@@ -188,12 +216,16 @@ Payment stores simulated payment records for orders.
 Payment calls Ordering when a pending payment succeeds.
 Ordering marks the order as Paid.
 Ordering commits Inventory reservation when order is marked as Paid.
+Fulfillment stores shipment records for orders.
+Fulfillment calls Ordering when a shipment is shipped.
+Ordering marks the order as Shipped.
 ```
 
 Current MVP simplification:
 
 ```text
 Payment success currently leads to Inventory reservation commit through Ordering.
+Fulfillment currently marks paid orders as Shipped through Ordering.
 In a fuller commerce flow, Inventory commit should move closer to fulfillment/shipment.
 ```
 
@@ -248,6 +280,21 @@ Payment failure does not call Ordering
 No Inventory reservation is committed by Payment failure
 ```
 
+```text
+Shipment flow:
+Product exists in Catalog
+Stock exists in Inventory
+Order is created in Ordering from product variant ID and quantity
+Ordering loads product snapshot from Catalog
+Inventory stock reservation is allocated
+Payment marks order as Paid
+Ordering commits Inventory reservation
+Shipment is created in Fulfillment
+Shipment is shipped
+Fulfillment calls Ordering to mark the order as Shipped
+Order is marked as Shipped
+```
+
 ## Local infrastructure
 
 Start databases and services:
@@ -259,19 +306,21 @@ docker compose up -d
 Docker Compose local service ports:
 
 ```text
-Catalog API   - http://localhost:5001
-Ordering API  - http://localhost:5002
-Inventory API - http://localhost:5003
-Payment API   - http://localhost:5004
-Cart API      - http://localhost:5005
+Catalog API     - http://localhost:5001
+Ordering API    - http://localhost:5002
+Inventory API   - http://localhost:5003
+Payment API     - http://localhost:5004
+Cart API        - http://localhost:5005
+Fulfillment API - http://localhost:5006
 ```
 
 Inside Docker Compose, services use internal service names:
 
 ```text
-Ordering -> Catalog:   http://catalog-api:8080
-Ordering -> Inventory: http://inventory-api:8080
-Payment  -> Ordering:  http://ordering-api:8080
+Ordering    -> Catalog:  http://catalog-api:8080
+Ordering    -> Inventory: http://inventory-api:8080
+Payment     -> Ordering: http://ordering-api:8080
+Fulfillment -> Ordering: http://ordering-api:8080
 ```
 
 Cart Service is currently independent from other backend services.
@@ -304,6 +353,12 @@ Cart database from host:
 
 ```text
 Host=localhost;Port=5437;Database=cart_db;Username=postgres;Password=postgres
+```
+
+Fulfillment database from host:
+
+```text
+Host=localhost;Port=5438;Database=fulfillment_db;Username=postgres;Password=postgres
 ```
 
 ## Run Catalog API locally
@@ -363,6 +418,21 @@ OrderingApi__BaseUrl="http://localhost:5172" \
 dotnet run --project services/payment/Payment.Api/Payment.Api.csproj
 ```
 
+## Run Fulfillment API locally
+
+Fulfillment API requires Ordering API for shipment shipping flow.
+
+Run Ordering API first.
+
+Then run Fulfillment API:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development \
+ConnectionStrings__DefaultConnection="Host=localhost;Port=5438;Database=fulfillment_db;Username=postgres;Password=postgres" \
+OrderingApi__BaseUrl="http://localhost:5172" \
+dotnet run --project services/fulfillment/Fulfillment.Api/Fulfillment.Api.csproj
+```
+
 ## Tests
 
 Catalog:
@@ -393,6 +463,12 @@ Payment:
 
 ```bash
 dotnet test services/payment/Payment.sln
+```
+
+Fulfillment:
+
+```bash
+dotnet test services/fulfillment/Fulfillment.sln
 ```
 
 ## Manual API checks
@@ -432,6 +508,13 @@ services/payment/Payment.Api/Payment.Api.http
 services/payment/Payment.Api/Payment.Api.readonly.http
 ```
 
+Fulfillment:
+
+```text
+services/fulfillment/Fulfillment.Api/Fulfillment.Api.http
+services/fulfillment/Fulfillment.Api/Fulfillment.Api.readonly.http
+```
+
 Files ending with `.readonly.http` contain only safe read-only requests.
 
 Write `.http` files may change local development data, but flows are designed to finish in terminal states and avoid active dangling reservations.
@@ -441,8 +524,10 @@ Write `.http` files may change local development data, but flows are designed to
 ```text
 docs/catalog-db.md
 docs/inventory-db.md
+docs/cart-db.md
 docs/ordering-db.md
 docs/payment-db.md
+docs/fulfillment-db.md
 docs/architecture.md
 docs/local-development.md
 docs/messages.md
@@ -501,6 +586,16 @@ payment provider references
 payment failure reasons
 ```
 
+Fulfillment owns:
+
+```text
+shipments
+shipment statuses
+carrier information
+tracking numbers
+shipment timestamps
+```
+
 ## Boundary rules
 
 Catalog does not store stock.
@@ -550,6 +645,18 @@ Payment calls Ordering when a pending payment succeeds.
 Payment does not write OrderingDb directly.
 
 Payment does not write InventoryDb directly.
+
+Fulfillment does not store order details.
+
+Fulfillment references orders by `order_id`.
+
+Fulfillment calls Ordering when a shipment is shipped.
+
+Fulfillment does not write OrderingDb directly.
+
+Fulfillment does not write InventoryDb directly.
+
+Fulfillment currently does not commit Inventory reservations.
 
 Inventory still allocates stock reservations during order creation, not during cart changes.
 
