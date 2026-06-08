@@ -1,6 +1,7 @@
 ### WARNING
 ### This file changes local development data.
-### Requests are additive and may create shipments.
+### Requests may create and update orders, shipments, reservations and stock movements.
+### Creating a shipment calls Ordering and requires the linked order to be Paid.
 ### Shipping a shipment calls Ordering and marks the linked order as Shipped.
 ### Current MVP behavior: Inventory reservation is already committed by Ordering mark-paid.
 ### Ordering API must be running and configured through OrderingApi:BaseUrl.
@@ -8,7 +9,6 @@
 
 @FulfillmentApi_HostAddress = http://localhost:5006
 @OrderingApi_HostAddress = http://localhost:5002
-@CatalogApi_HostAddress = http://localhost:5001
 @InventoryApi_HostAddress = http://localhost:5003
 
 @runId = 001
@@ -18,6 +18,10 @@
 
 ### Health check
 GET {{FulfillmentApi_HostAddress}}/health
+
+
+### Check Inventory stock before flow
+GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 
 ### Create paid order for shipment flow
@@ -94,13 +98,36 @@ Content-Type: application/json
 }
 
 
+### Create paid order for shipment cancel flow
+# @name createOrderForShipmentCancel
+POST {{OrderingApi_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Shipment Cancel Flow Customer {{runId}}",
+  "customerEmail": "shipment-cancel-flow-{{runId}}@example.com",
+  "items": [
+    {
+      "productVariantId": "{{productVariantId}}",
+      "quantity": 1
+    }
+  ]
+}
+
+
+### Mark cancel-flow order as paid
+@orderToCancelShipmentForId = {{createOrderForShipmentCancel.response.body.$.id}}
+
+POST {{OrderingApi_HostAddress}}/api/orders/{{orderToCancelShipmentForId}}/mark-paid
+
+
 ### Create shipment for cancel flow
 # @name createShipmentForCancel
 POST {{FulfillmentApi_HostAddress}}/api/shipments
 Content-Type: application/json
 
 {
-  "orderId": "00000000-0000-0000-0000-000000000001",
+  "orderId": "{{orderToCancelShipmentForId}}",
   "carrier": "Manual",
   "trackingNumber": "TRACK-CANCEL-{{runId}}"
 }
@@ -116,6 +143,40 @@ POST {{FulfillmentApi_HostAddress}}/api/shipments/{{shipmentToCancelId}}/cancel
 GET {{FulfillmentApi_HostAddress}}/api/shipments/{{shipmentToCancelId}}
 
 
+### Create unpaid order for invalid shipment flow
+# @name createUnpaidOrderForInvalidShipment
+POST {{OrderingApi_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Unpaid Shipment Customer {{runId}}",
+  "customerEmail": "unpaid-shipment-{{runId}}@example.com",
+  "items": [
+    {
+      "productVariantId": "{{productVariantId}}",
+      "quantity": 1
+    }
+  ]
+}
+
+
+### Create shipment for unpaid order should return 400
+@unpaidOrderId = {{createUnpaidOrderForInvalidShipment.response.body.$.id}}
+
+POST {{FulfillmentApi_HostAddress}}/api/shipments
+Content-Type: application/json
+
+{
+  "orderId": "{{unpaidOrderId}}",
+  "carrier": "Manual",
+  "trackingNumber": "TRACK-UNPAID-{{runId}}"
+}
+
+
+### Cancel unpaid order after invalid shipment check
+POST {{OrderingApi_HostAddress}}/api/orders/{{unpaidOrderId}}/cancel
+
+
 ### Create invalid shipment without order id should return 400
 POST {{FulfillmentApi_HostAddress}}/api/shipments
 Content-Type: application/json
@@ -124,6 +185,17 @@ Content-Type: application/json
   "orderId": "00000000-0000-0000-0000-000000000000",
   "carrier": "Manual",
   "trackingNumber": "TRACK-INVALID"
+}
+
+
+### Create shipment for missing order should return 404
+POST {{FulfillmentApi_HostAddress}}/api/shipments
+Content-Type: application/json
+
+{
+  "orderId": "00000000-0000-0000-0000-000000000001",
+  "carrier": "Manual",
+  "trackingNumber": "TRACK-MISSING-ORDER-{{runId}}"
 }
 
 

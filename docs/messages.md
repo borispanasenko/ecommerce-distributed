@@ -25,6 +25,7 @@ Payment -> Ordering
 - mark order as Paid
 
 Fulfillment -> Ordering
+- get order details
 - mark order as Shipped
 ```
 
@@ -147,15 +148,17 @@ OrderPaid
 
 ## Fulfillment -> Ordering
 
-Fulfillment calls Ordering when a shipment is shipped.
+Fulfillment calls Ordering when creating and shipping shipments.
 
 ```text
+GET  /api/orders/{orderId}
 POST /api/orders/{orderId}/mark-shipped
 ```
 
 Purpose:
 
 ```text
+Validate that the linked order exists and is Paid before creating a shipment.
 Mark paid order as Shipped after shipment is shipped.
 ```
 
@@ -163,9 +166,13 @@ Current behavior:
 
 ```text
 Fulfillment stores shipment records.
+Fulfillment checks the linked order through Ordering before creating a shipment.
+Fulfillment creates shipments only for Paid orders.
+Fulfillment rejects shipment creation if the order does not exist.
+Fulfillment rejects shipment creation if the order is not Paid.
 Fulfillment ships pending shipments.
 Fulfillment calls Ordering to mark the linked order as Shipped.
-Ordering accepts only Paid orders.
+Ordering accepts only Paid orders for mark-shipped.
 Ordering rejects PendingPayment, Cancelled and already Shipped orders.
 Fulfillment keeps shipment Pending if Ordering rejects mark-shipped.
 ```

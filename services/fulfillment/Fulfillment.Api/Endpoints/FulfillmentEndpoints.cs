@@ -111,6 +111,7 @@ public static class FulfillmentEndpoints
         return result.ErrorCode switch
         {
             "shipment_not_found" => Results.NotFound(error),
+            "order_not_found" => Results.NotFound(error),
             _ => Results.BadRequest(error)
         };
     }
