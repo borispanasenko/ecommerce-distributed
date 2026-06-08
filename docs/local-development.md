@@ -112,7 +112,7 @@ OrderingApi__BaseUrl="http://localhost:5172" \
 dotnet run --project services/fulfillment/Fulfillment.Api/Fulfillment.Api.csproj
 ```
 
-If a service is started with a different local port from `launchSettings.json`, update the corresponding `CatalogApi__BaseUrl`, `InventoryApi__BaseUrl` or `OrderingApi__BaseUrl`.
+If a service is started with a different local port from `launchSettings.json`, update the corresponding cross-service base URL, such as `CatalogApi__BaseUrl`, `InventoryApi__BaseUrl` or `OrderingApi__BaseUrl`.
 
 ---
 
@@ -149,7 +149,7 @@ Inventory manual checks:
 
 ```text
 services/inventory/Inventory.Api/Inventory.Api.http
-services/inventory/Inventory.Api.readonly.http
+services/inventory/Inventory.Api/Inventory.Api.readonly.http
 ```
 
 Cart manual checks:

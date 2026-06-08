@@ -40,9 +40,9 @@ Payment stores payment records for orders.
 Payment calls Ordering when a pending payment succeeds.
 Ordering marks the order as Paid.
 Ordering commits Inventory reservation when order is marked as Paid.
-Fulfillment creates shipments for paid orders.
+Fulfillment creates shipment records for orders.
 Fulfillment calls Ordering when a shipment is shipped.
-Ordering marks the order as Shipped.
+Ordering accepts only Paid orders for the Shipped transition.
 ```
 
 ---
@@ -143,7 +143,7 @@ Ordering stores product snapshots so old orders do not change when Catalog data 
 Inventory stores stock by SKU.
 Inventory chooses warehouse and storage location during stock allocation.
 
-Payments reference orders by order_id.
+Payment reference orders by order_id.
 Payment does not write OrderingDb directly.
 Payment does not write InventoryDb directly.
 

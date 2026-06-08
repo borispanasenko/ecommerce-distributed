@@ -193,6 +193,7 @@ OrderShipped
 
 ```text
 ProductVariantChanged
+ProductVariantArchived
 ProductPriceChanged
 OrderCreated
 StockReservationAllocated
