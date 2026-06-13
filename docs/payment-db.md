@@ -103,8 +103,7 @@ Rules:
 * Only `Pending` payments can be marked as `Succeeded`.
 * Only `Pending` payments can be marked as `Failed`.
 * `Succeeded` and `Failed` payments cannot be changed again.
-* Failed payments do not call Ordering.
-* Failed payments do not commit Inventory reservations.
+* Failed payments do not call Ordering and do not commit Inventory reservations.
 
 ---
 
@@ -180,6 +179,7 @@ List payments
 Get payment details
 Mark payment as succeeded
 Call Ordering to mark order as Paid
+Keep Inventory reservation allocated until the paid order is shipped
 Mark payment as failed
 ```
 
@@ -191,10 +191,10 @@ Payments can be marked as Succeeded.
 Payments can be marked as Failed.
 Only Pending payments can be completed.
 When a pending payment succeeds, Payment Service calls Ordering Service to mark the linked order as Paid.
-Ordering commits Inventory reservation after order is marked as Paid.
+Ordering marks the linked order as Paid and keeps Inventory reservation allocated.
+Inventory reservation is committed later when the paid order is marked as Shipped.
 If Ordering mark-paid request fails, payment remains Pending.
-Failed payments do not call Ordering.
-Failed payments do not commit Inventory reservations.
+Failed payments do not call Ordering and do not commit Inventory reservations.
 Succeeded payments cannot be failed.
 Failed payments cannot be succeeded.
 Payments with empty order_id are rejected.

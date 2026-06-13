@@ -319,6 +319,8 @@ These may be added later only if there is a clear business reason.
 Inventory Service currently supports:
 
 ```text
+GET  /health
+
 GET  /api/warehouses
 POST /api/warehouses
 
@@ -330,6 +332,7 @@ GET  /api/stock/{sku}
 GET  /api/stock/movements
 
 POST /api/stock/reservations
+POST /api/stock/reservations/allocate
 POST /api/stock/reservations/{id}/release
 POST /api/stock/reservations/{id}/commit
 ```
@@ -338,7 +341,8 @@ Current stock flow:
 
 ```text
 Receive stock
-Reserve stock
+Reserve stock explicitly
+Allocate stock reservation by SKU
 Release reservation
 Commit reservation
 ```

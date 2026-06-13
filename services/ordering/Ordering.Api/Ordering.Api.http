@@ -1,11 +1,11 @@
 ### WARNING
 ### This file changes local development data.
-### Requests are additive and may create orders, reservations and stock movements.
+### Requests may create and update orders, reservations and stock movements.
 ### Flows are designed to finish in terminal states and avoid active dangling reservations.
 ### Creating an order loads product snapshots from Catalog and allocates Inventory stock.
 ### Cancelling an order releases Inventory reservation.
-### Marking an order as paid commits Inventory reservation.
-### Marking a paid order as shipped changes order status only in the current MVP.
+### Marking an order as paid keeps Inventory reservation allocated.
+### Marking a paid order as shipped commits Inventory reservation.
 ### Catalog API must be running and configured through CatalogApi:BaseUrl.
 ### Inventory API must be running and configured through InventoryApi:BaseUrl.
 ### Change runId before running the full flow again.
@@ -96,7 +96,8 @@ GET {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}
 GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 
-### Mark order as paid and commit Inventory reservation
+### Mark order as paid
+### Inventory reservation remains allocated until the order is shipped.
 POST {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}/mark-paid
 
 
@@ -105,12 +106,11 @@ GET {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}
 
 
 ### Check Inventory stock after mark-paid
+### Stock should not be committed yet; reservation remains allocated.
 GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 
-### Mark paid order as shipped
-### Current MVP behavior: this updates order status only.
-### Inventory reservation was already committed by mark-paid.
+### Mark paid order as shipped and commit Inventory reservation
 POST {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}/mark-shipped
 
 
@@ -119,7 +119,7 @@ GET {{OrderingApi_HostAddress}}/api/orders/{{orderToMarkPaidId}}
 
 
 ### Check Inventory stock after mark-shipped
-### Current MVP behavior: stock should not change here.
+### Stock should change here because mark-shipped commits Inventory reservation.
 GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 

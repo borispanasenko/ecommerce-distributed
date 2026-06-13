@@ -2,9 +2,11 @@
 ### This file changes local development data.
 ### Requests may create and update orders, shipments, reservations and stock movements.
 ### Creating a shipment calls Ordering and requires the linked order to be Paid.
-### Shipping a shipment calls Ordering and marks the linked order as Shipped.
-### Current MVP behavior: Inventory reservation is already committed by Ordering mark-paid.
-### Ordering API must be running and configured through OrderingApi:BaseUrl.
+### Ordering mark-paid marks the order as Paid and keeps Inventory reservation allocated.
+### Shipping a shipment calls Ordering mark-shipped, marks the linked order as Shipped and commits Inventory reservation.
+### Fulfillment API must be running and configured through OrderingApi:BaseUrl.
+### Ordering API must be running and configured through CatalogApi:BaseUrl and InventoryApi:BaseUrl.
+### Inventory API must be running for stock checks.
 ### Change runId before running the full flow again.
 
 @FulfillmentApi_HostAddress = http://localhost:5006
@@ -84,7 +86,8 @@ GET {{OrderingApi_HostAddress}}/api/orders/{{orderId}}
 
 
 ### Check Inventory stock after shipment shipped
-### Current MVP behavior: stock should not change here because mark-paid already committed reservation.
+### Stock should change here because shipment shipping calls Ordering mark-shipped.
+### Ordering mark-shipped commits Inventory reservation.
 GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 
@@ -141,6 +144,37 @@ POST {{FulfillmentApi_HostAddress}}/api/shipments/{{shipmentToCancelId}}/cancel
 
 ### Get cancelled shipment
 GET {{FulfillmentApi_HostAddress}}/api/shipments/{{shipmentToCancelId}}
+
+### Create replacement shipment after cancellation
+# @name createReplacementShipmentAfterCancel
+POST {{FulfillmentApi_HostAddress}}/api/shipments
+Content-Type: application/json
+
+{
+  "orderId": "{{orderToCancelShipmentForId}}",
+  "carrier": "Manual",
+  "trackingNumber": "TRACK-REPLACEMENT-{{runId}}"
+}
+
+
+### Ship replacement shipment and commit Inventory reservation
+@replacementShipmentId = {{createReplacementShipmentAfterCancel.response.body.$.id}}
+
+POST {{FulfillmentApi_HostAddress}}/api/shipments/{{replacementShipmentId}}/ship
+Content-Type: application/json
+
+{
+  "carrier": "Manual",
+  "trackingNumber": "TRACK-REPLACEMENT-SHIPPED-{{runId}}"
+}
+
+
+### Get replacement shipment after ship
+GET {{FulfillmentApi_HostAddress}}/api/shipments/{{replacementShipmentId}}
+
+
+### Get cancel-flow order after replacement shipment shipped
+GET {{OrderingApi_HostAddress}}/api/orders/{{orderToCancelShipmentForId}}
 
 
 ### Create unpaid order for invalid shipment flow

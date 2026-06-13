@@ -1,11 +1,16 @@
 ### WARNING
 ### This file changes local development data.
-### Requests are additive and may create orders, payments, reservations and stock movements.
+### Requests may create and update orders, payments, reservations and stock movements.
 ### Flows are designed to finish in terminal states and avoid active dangling reservations.
 ### Creating an order through this file loads product snapshots from Catalog and allocates Inventory stock.
-### Succeeding a payment marks the order as Paid and commits Inventory reservation.
+### Succeeding a payment marks the order as Paid.
+### Inventory reservation is committed later when the paid order is shipped.
+### This smoke flow marks the paid order as Shipped through Ordering to finish Inventory state.
+### In the full application flow, Fulfillment is expected to trigger shipping.
 ### Failed payment flow uses a fake order id to avoid Inventory side effects.
+### Payment API must be running and configured through OrderingApi:BaseUrl.
 ### Ordering API must be running and configured through CatalogApi:BaseUrl and InventoryApi:BaseUrl.
+### Inventory API must be running for stock checks.
 ### Change runId before running the full flow again.
 
 @PaymentApi_HostAddress = http://localhost:5206
@@ -73,7 +78,8 @@ GET {{PaymentApi_HostAddress}}/api/payments/{{paymentId}}
 
 
 ### Mark payment as succeeded
-### This should mark the order as Paid and commit Inventory reservation.
+### This should mark the order as Paid.
+### Inventory reservation remains allocated until shipment.
 POST {{PaymentApi_HostAddress}}/api/payments/{{paymentId}}/succeed
 Content-Type: application/json
 
@@ -91,6 +97,22 @@ GET {{OrderingApi_HostAddress}}/api/orders/{{orderId}}
 
 
 ### Check Inventory stock after payment succeed
+### Stock should not be committed yet; reservation remains allocated until shipment.
+GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
+
+
+### Mark paid order as shipped through Ordering
+### This commits Inventory reservation and finishes this smoke flow.
+### In the full application flow, Fulfillment is expected to call mark-shipped.
+POST {{OrderingApi_HostAddress}}/api/orders/{{orderId}}/mark-shipped
+
+
+### Get order details after smoke shipment
+GET {{OrderingApi_HostAddress}}/api/orders/{{orderId}}
+
+
+### Check Inventory stock after smoke shipment
+### Stock should change here because mark-shipped commits Inventory reservation.
 GET {{InventoryApi_HostAddress}}/api/stock/{{sku}}
 
 

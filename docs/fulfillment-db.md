@@ -42,7 +42,7 @@ Other services may reference fulfillment data by `shipment_id`, but they must no
 1. Fulfillment owns shipment lifecycle.
 2. Ordering owns order lifecycle.
 3. Fulfillment references orders by `order_id`.
-4. Fulfillment calls Ordering API when a shipment is shipped.
+4. Fulfillment calls Ordering API to validate linked orders before shipment creation and to mark orders as Shipped when shipments are shipped.
 5. Fulfillment does not write `OrderingDb` directly.
 6. Fulfillment does not write `InventoryDb` directly.
 7. Tables use UUID primary keys.
@@ -97,6 +97,10 @@ Rules:
 * Cancelled shipments cannot be shipped.
 * Shipping a shipment calls Ordering API to mark the linked order as `Shipped`.
 * If Ordering rejects `mark-shipped`, the shipment remains `Pending`.
+* Creating a shipment validates the linked order through Ordering.
+* A shipment can be created only for a Paid order.
+* If the linked order does not exist, shipment creation is rejected.
+* If the linked order is not Paid, shipment creation is rejected.
 
 ---
 
@@ -112,12 +116,16 @@ Pending -> Cancelled
 Current shipment flow:
 
 ```text
-Create shipment
-Shipment is Pending
-Ship shipment
-Fulfillment calls Ordering mark-shipped
-Ordering marks paid order as Shipped
-Shipment becomes Shipped
+Create shipment request is received.
+Fulfillment checks linked order through Ordering.
+Ordering returns order details.
+Fulfillment verifies that order status is Paid.
+Shipment is created as Pending.
+Ship shipment.
+Fulfillment calls Ordering mark-shipped.
+Ordering commits Inventory reservation during mark-shipped.
+Ordering marks paid order as Shipped.
+Shipment becomes Shipped.
 ```
 
 Cancel flow:
@@ -130,13 +138,16 @@ Shipment becomes Cancelled
 Order is not changed
 ```
 
+Inventory reservation remains allocated until the order is shipped or a future order cancellation/refund flow handles it.
+
 ---
 
 ## Ordering integration
 
-Fulfillment Service calls Ordering Service when a shipment is shipped:
+Fulfillment Service calls Ordering Service when creating and shipping shipments.
 
 ```text
+GET /api/orders/{orderId}
 POST /api/orders/{orderId}/mark-shipped
 ```
 
@@ -147,6 +158,9 @@ Only Paid orders can be marked as Shipped.
 PendingPayment orders cannot be marked as Shipped.
 Cancelled orders cannot be marked as Shipped.
 Already Shipped orders cannot be marked as Shipped again.
+Order details can be loaded by order id.
+Only Paid orders can be used for shipment creation.
+Mark-shipped commits Inventory reservation before marking the order as Shipped.
 ```
 
 Fulfillment behavior when Ordering rejects `mark-shipped`:
@@ -156,32 +170,28 @@ Shipment remains Pending.
 Fulfillment returns Ordering error code and message.
 ```
 
+Fulfillment behavior when Ordering rejects order validation:
+
+```text
+Shipment is not created.
+Fulfillment returns Ordering error code and message.
+```
+
 ---
 
-## Current MVP simplification
-
-Current system behavior:
+## Current Inventory commit boundary
 
 ```text
 Payment success calls Ordering mark-paid.
 Ordering marks order as Paid.
-Ordering commits Inventory reservation during mark-paid.
-Fulfillment later marks shipment as Shipped.
-Ordering marks order as Shipped.
-Shipping does not currently commit Inventory reservation.
-```
-
-Target future behavior:
-
-```text
-Payment success marks order as Paid.
-Inventory reservation remains allocated.
+Inventory reservation remains allocated while order is Paid.
+Fulfillment validates Paid orders through Ordering before creating shipments.
 Fulfillment ships shipment.
-Inventory reservation is committed around fulfillment/shipment.
-Order is marked as Shipped.
+Fulfillment calls Ordering mark-shipped.
+Ordering commits Inventory reservation during mark-shipped.
+Ordering marks order as Shipped.
+Fulfillment does not call Inventory directly.
 ```
-
-The current implementation keeps Inventory commit in Ordering `mark-paid` to avoid breaking the existing payment flow while Fulfillment Service is introduced.
 
 ---
 
@@ -275,10 +285,16 @@ Only Pending shipments can be shipped.
 Only Pending shipments can be cancelled.
 Shipping a shipment calls Ordering to mark order as Shipped.
 If Ordering rejects mark-shipped, shipment remains Pending.
+Shipment is not created if linked order validation fails.
 Cancelling a shipment does not change order state.
 Shipped shipments cannot be shipped again.
 Shipped shipments cannot be cancelled.
 Cancelled shipments cannot be shipped.
+Creating a shipment checks linked order through Ordering.
+Shipments can be created only for Paid orders.
+Shipment creation is rejected if the linked order does not exist.
+Shipment creation is rejected if the linked order is not Paid.
+Ordering commits Inventory reservation during mark-shipped.
 ```
 
 Current tests:
@@ -299,14 +315,12 @@ Missing shipment tests
 Future work:
 
 ```text
-Validate order status before shipment creation.
 Add shipment address.
 Add shipment item lines.
 Add shipment event history.
 Add carrier integration.
 Add partial shipment support.
 Add delivery tracking.
-Move Inventory commit from Ordering mark-paid to Fulfillment shipment step.
 Add idempotency for ship and cancel operations.
 Add optimistic concurrency for shipment updates.
 ```

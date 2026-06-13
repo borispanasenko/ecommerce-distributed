@@ -19,7 +19,7 @@ Ordering -> Catalog
 Ordering -> Inventory
 - allocate stock reservation
 - release reservation
-- commit reservation
+- commit reservation during mark-shipped
 
 Payment -> Ordering
 - mark order as Paid
@@ -66,7 +66,7 @@ ProductPriceChanged
 
 ## Ordering -> Inventory
 
-Ordering calls Inventory when creating, cancelling and marking orders as paid.
+Ordering calls Inventory when creating orders, cancelling pending orders and marking paid orders as shipped.
 
 ```text
 POST /api/stock/reservations/allocate
@@ -79,7 +79,7 @@ Purpose:
 ```text
 Allocate stock during order creation.
 Release stock reservation when an order is cancelled.
-Commit stock reservation when an order is marked as Paid.
+Commit stock reservation when a paid order is marked as Shipped.
 ```
 
 Current behavior:
@@ -89,14 +89,8 @@ Ordering allocates Inventory stock reservation during order creation.
 Inventory chooses warehouse and storage location during allocation.
 Ordering stores inventory_reservation_id on order items.
 Ordering releases Inventory reservations when PendingPayment orders are cancelled.
-Ordering commits Inventory reservations when PendingPayment orders are marked as Paid.
-```
-
-Current MVP simplification:
-
-```text
-Inventory reservation commit currently happens during Ordering mark-paid.
-In a fuller commerce flow, Inventory commit should move closer to fulfillment/shipment.
+Ordering keeps Inventory reservations allocated when orders are marked as Paid.
+Ordering commits Inventory reservations when Paid orders are marked as Shipped.
 ```
 
 Future message candidates:
@@ -132,7 +126,7 @@ Payment marks pending payment as Succeeded.
 Payment calls Ordering to mark the linked order as Paid.
 Ordering accepts only PendingPayment orders.
 Ordering rejects Cancelled, Paid and Shipped orders.
-Ordering commits Inventory reservations during mark-paid.
+Ordering marks the linked order as Paid and keeps Inventory reservations allocated until shipment.
 Payment remains Pending if Ordering rejects mark-paid.
 ```
 
@@ -173,16 +167,17 @@ Fulfillment rejects shipment creation if the order is not Paid.
 Fulfillment ships pending shipments.
 Fulfillment calls Ordering to mark the linked order as Shipped.
 Ordering accepts only Paid orders for mark-shipped.
+Ordering commits Inventory reservations during mark-shipped.
 Ordering rejects PendingPayment, Cancelled and already Shipped orders.
 Fulfillment keeps shipment Pending if Ordering rejects mark-shipped.
 ```
 
-Current MVP simplification:
+Boundary note:
 
 ```text
-Fulfillment currently does not commit Inventory reservations.
-Inventory reservation commit currently happens during Ordering mark-paid.
-In a fuller commerce flow, Inventory commit may move closer to this fulfillment/shipment step.
+Fulfillment does not call Inventory directly.
+Inventory reservation commit is performed by Ordering during mark-shipped.
+Ordering owns order items and inventory_reservation_id references.
 ```
 
 Future message candidates:

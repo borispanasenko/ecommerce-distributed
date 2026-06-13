@@ -58,7 +58,7 @@ Ordering API requires Catalog API for product snapshots and Inventory API for st
 
 Payment API requires Ordering API for successful payment flow.
 
-Fulfillment API requires Ordering API for shipment shipping flow.
+Fulfillment API requires Ordering API for shipment creation validation and shipment shipping flow.
 
 Catalog:
 
@@ -204,7 +204,7 @@ Ordering loads product snapshot from Catalog.
 Ordering asks Inventory to allocate stock reservation by SKU.
 Ordering stores product snapshot and inventoryReservationId.
 Payment can mark the order as Paid.
-Ordering commits Inventory reservation when order is marked as Paid.
+Ordering keeps Inventory reservation allocated while the order is Paid.
 ```
 
 ---
@@ -212,20 +212,26 @@ Ordering commits Inventory reservation when order is marked as Paid.
 ## Current fulfillment backend flow
 
 ```text
-Client or operator creates shipment for an order.
+Client or operator creates shipment for a Paid order.
+Fulfillment validates linked order through Ordering.
 Fulfillment stores shipment as Pending.
 Client or operator ships shipment.
 Fulfillment calls Ordering to mark order as Shipped.
 Ordering accepts only Paid -> Shipped transition.
+Ordering commits Inventory reservation during mark-shipped.
 Fulfillment marks shipment as Shipped.
 ```
 
 ---
 
-## Current MVP simplification
+## Current Inventory commit boundary
 
 ```text
-Payment success currently leads to Inventory reservation commit through Ordering.
-Fulfillment currently marks paid orders as Shipped through Ordering.
-In a fuller commerce flow, Inventory commit should move closer to fulfillment/shipment.
+Inventory reservation is allocated during order creation.
+Payment success marks the order as Paid.
+Inventory reservation remains allocated while the order is Paid.
+Fulfillment shipping triggers Ordering mark-shipped.
+Ordering commits Inventory reservation during mark-shipped.
+Fulfillment does not call Inventory directly.
+Ordering owns inventoryReservationId references stored on order items.
 ```

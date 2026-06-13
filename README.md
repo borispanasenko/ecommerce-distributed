@@ -136,8 +136,9 @@ Get order details
 Cancel order
 Release Inventory reservation
 Mark order as Paid
-Commit Inventory reservation
+Keep Inventory reservation allocated while order is Paid
 Mark paid order as Shipped
+Commit Inventory reservation during mark-shipped
 ```
 
 ## Ordering API
@@ -161,7 +162,7 @@ List payments
 Get payment details
 Mark payment as succeeded
 Mark linked order as Paid through Ordering
-Commit Inventory reservation through Ordering
+Keep Inventory reservation allocated until the paid order is shipped
 Mark payment as failed
 Reject status changes after payment completion
 ```
@@ -181,11 +182,13 @@ POST /api/payments/{id}/fail
 ## Fulfillment flow
 
 ```text
-Create shipment for order
+Create shipment for paid order
+Validate linked order through Ordering
 List shipments
 Get shipment details
 Ship shipment
 Mark linked order as Shipped through Ordering
+Commit Inventory reservation through Ordering mark-shipped
 Cancel pending shipment
 Reject shipment changes after terminal status
 ```
@@ -215,18 +218,24 @@ Ordering releases Inventory reservation when an order is cancelled.
 Payment stores simulated payment records for orders.
 Payment calls Ordering when a pending payment succeeds.
 Ordering marks the order as Paid.
-Ordering commits Inventory reservation when order is marked as Paid.
+Ordering keeps Inventory reservation allocated while the order is Paid.
+Fulfillment validates paid orders through Ordering.
 Fulfillment stores shipment records for orders.
 Fulfillment calls Ordering when a shipment is shipped.
+Ordering commits Inventory reservation during mark-shipped.
 Ordering marks the order as Shipped.
 ```
 
-Current MVP simplification:
+Current Inventory commit boundary:
 
 ```text
-Payment success currently leads to Inventory reservation commit through Ordering.
-Fulfillment currently marks paid orders as Shipped through Ordering.
-In a fuller commerce flow, Inventory commit should move closer to fulfillment/shipment.
+Ordering allocates Inventory reservations during order creation.
+Ordering releases Inventory reservations when PendingPayment orders are cancelled.
+Ordering keeps Inventory reservations allocated when orders are marked as Paid.
+Fulfillment triggers mark-shipped through Ordering when shipments are shipped.
+Ordering commits Inventory reservations when Paid orders are marked as Shipped.
+Fulfillment does not call Inventory directly.
+Ordering owns inventory_reservation_id references stored on order items.
 ```
 
 Completed scenarios:
@@ -267,8 +276,9 @@ Payment is created for the order
 Payment is marked as Succeeded
 Payment calls Ordering to mark the order as Paid
 Order is marked as Paid
-Ordering commits Inventory reservation
-Inventory on-hand stock is decreased
+Inventory reservation remains allocated
+Inventory reservation is not committed yet
+Inventory on-hand stock is not decreased yet
 ```
 
 ```text
@@ -287,12 +297,15 @@ Stock exists in Inventory
 Order is created in Ordering from product variant ID and quantity
 Ordering loads product snapshot from Catalog
 Inventory stock reservation is allocated
-Payment marks order as Paid
-Ordering commits Inventory reservation
-Shipment is created in Fulfillment
+Payment calls Ordering to mark the order as Paid
+Inventory reservation remains allocated
+Shipment is created in Fulfillment for the Paid order
+Fulfillment validates linked order through Ordering
 Shipment is shipped
 Fulfillment calls Ordering to mark the order as Shipped
+Ordering commits Inventory reservation during mark-shipped
 Order is marked as Shipped
+Inventory on-hand stock is decreased
 ```
 
 ## Local infrastructure
@@ -420,7 +433,7 @@ dotnet run --project services/payment/Payment.Api/Payment.Api.csproj
 
 ## Run Fulfillment API locally
 
-Fulfillment API requires Ordering API for shipment shipping flow.
+Fulfillment API requires Ordering API for shipment creation validation and shipment shipping flow.
 
 Run Ordering API first.
 
@@ -632,9 +645,11 @@ Ordering may reference Inventory reservations by `inventory_reservation_id`.
 
 Ordering creates Inventory reservations when orders are created.
 
-Ordering releases Inventory reservations when orders are cancelled.
+Ordering releases Inventory reservations when PendingPayment orders are cancelled.
 
-Ordering currently commits Inventory reservations when orders are marked as Paid.
+Ordering keeps Inventory reservations allocated when orders are marked as Paid.
+
+Ordering commits Inventory reservations when Paid orders are marked as Shipped.
 
 Payment does not store order details.
 
@@ -652,11 +667,15 @@ Fulfillment references orders by `order_id`.
 
 Fulfillment calls Ordering when a shipment is shipped.
 
+Fulfillment validates linked orders through Ordering before shipment creation.
+
 Fulfillment does not write OrderingDb directly.
 
 Fulfillment does not write InventoryDb directly.
 
-Fulfillment currently does not commit Inventory reservations.
+Fulfillment does not call Inventory directly.
+
+Fulfillment does not commit Inventory reservations directly.
 
 Inventory still allocates stock reservations during order creation, not during cart changes.
 

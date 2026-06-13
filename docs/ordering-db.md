@@ -53,7 +53,7 @@ Other services may reference ordering data by `order_id`, but they must not read
 12. Ordering gets trusted product snapshots from Catalog through Catalog API.
 13. Ordering asks Inventory to allocate stock reservations by SKU.
 14. Clients do not provide trusted product names, prices, SKUs or warehouse locations during checkout.
-15. Fulfillment calls Ordering to mark paid orders as shipped.
+15. Fulfillment calls Ordering to mark paid orders as shipped and trigger Inventory reservation commit.
 
 ---
 
@@ -301,8 +301,9 @@ Get order details
 Cancel order
 Release Inventory reservation
 Mark order as Paid
-Commit Inventory reservation
+Keep Inventory reservation allocated while order is Paid
 Mark paid order as Shipped
+Commit Inventory reservation during mark-shipped
 ```
 
 Current behavior:
@@ -329,11 +330,12 @@ Only PendingPayment orders can be cancelled.
 Cancelling an order releases Inventory reservations.
 Cancelled orders cannot be cancelled again.
 Only PendingPayment orders can be marked as Paid.
-Marking an order as Paid commits Inventory reservations.
+Marking an order as Paid keeps Inventory reservations allocated.
 Paid orders cannot be cancelled.
 Paid orders cannot be marked as Paid again.
 Only Paid orders can be marked as Shipped.
-Marking an order as Shipped changes order status only in the current MVP.
+Marking an order as Shipped commits Inventory reservations and changes order status to Shipped.
+If Inventory commit fails during mark-shipped, the order remains Paid.
 Shipped orders cannot be cancelled.
 Shipped orders cannot be marked as Paid again.
 Shipped orders cannot be marked as Shipped again.
@@ -343,12 +345,16 @@ GET /api/orders returns order summaries.
 GET /api/orders/{id} returns order details.
 ```
 
-Current MVP simplification:
+# Current Inventory commit boundary
 
 ```text
-Ordering currently commits Inventory reservations when orders are marked as Paid.
-Fulfillment currently marks paid orders as Shipped through Ordering.
-In a fuller commerce flow, Inventory commit should move closer to fulfillment/shipment.
+Ordering allocates Inventory reservations during order creation.
+Ordering releases Inventory reservations when PendingPayment orders are cancelled.
+Ordering keeps Inventory reservations allocated when orders are marked as Paid.
+Ordering commits Inventory reservations when Paid orders are marked as Shipped.
+Fulfillment triggers mark-shipped through Ordering.
+Fulfillment does not call Inventory directly.
+Ordering owns inventory_reservation_id references stored on order items.
 ```
 
 Current tests:
@@ -364,15 +370,16 @@ Order details tests
 Cancel order tests
 Mark paid tests
 Mark shipped tests
-Inventory reservation commit tests
+Inventory reservation commit on mark-shipped tests
+Inventory reservation commit failure tests
 Missing order tests
 ```
 
 Future work:
 
 ```text
-Move Inventory commit from payment success to fulfillment/shipment flow.
 Handle payment failure effects on order lifecycle.
+Add reservation expiration flow for unpaid orders.
 Add order event history.
 Add richer shipment integration.
 Add refund flow.

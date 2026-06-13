@@ -39,10 +39,13 @@ Ordering asks Inventory to allocate stock reservations by SKU.
 Payment stores payment records for orders.
 Payment calls Ordering when a pending payment succeeds.
 Ordering marks the order as Paid.
-Ordering commits Inventory reservation when order is marked as Paid.
-Fulfillment creates shipment records for orders.
+Ordering keeps Inventory reservation allocated when the order is marked as Paid.
+Fulfillment validates paid orders through Ordering.
+Fulfillment creates shipment records for paid orders.
 Fulfillment calls Ordering when a shipment is shipped.
 Ordering accepts only Paid orders for the Shipped transition.
+Ordering commits Inventory reservation when the paid order is marked as Shipped.
+Ordering marks the order as Shipped.
 ```
 
 ---
@@ -82,7 +85,7 @@ Payment is created.
 Payment is marked as Succeeded.
 Payment calls Ordering to mark the order as Paid.
 Ordering marks the order as Paid.
-Ordering commits Inventory reservation.
+Inventory reservation remains allocated until shipment.
 ```
 
 ---
@@ -102,20 +105,24 @@ Inventory reservation is not committed by Payment failure.
 
 ```text
 Order is paid.
+Inventory reservation is still allocated.
+Fulfillment validates the paid order through Ordering.
 Shipment is created.
 Shipment is shipped.
 Fulfillment calls Ordering to mark the order as Shipped.
+Ordering commits Inventory reservation during mark-shipped.
 Ordering marks the order as Shipped.
 ```
 
 ---
 
-## Current MVP simplification
+## Current Inventory commit boundary
 
 ```text
-Payment success currently leads to Inventory reservation commit through Ordering.
-Fulfillment currently marks paid orders as Shipped through Ordering.
-In a fuller commerce flow, Inventory commit should move closer to fulfillment/shipment.
+Inventory reservation commit happens during Ordering mark-shipped.
+Fulfillment triggers mark-shipped through Ordering.
+Fulfillment does not call Inventory directly.
+Ordering owns inventory_reservation_id references stored on order items.
 ```
 
 ---
@@ -152,5 +159,7 @@ Fulfillment references orders by order_id.
 Fulfillment calls Ordering to mark orders as Shipped.
 Fulfillment does not write OrderingDb directly.
 Fulfillment does not write InventoryDb directly.
-Fulfillment currently does not commit Inventory reservations.
+Fulfillment does not call Inventory directly.
+Fulfillment triggers Inventory commit indirectly through Ordering mark-shipped.
+Ordering owns inventory_reservation_id references stored on order items.
 ```

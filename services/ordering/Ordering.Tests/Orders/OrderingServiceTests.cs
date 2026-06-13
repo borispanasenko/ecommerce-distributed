@@ -390,7 +390,7 @@ public sealed class OrderingServiceTests
     }
 
     [Fact]
-    public async Task MarkOrderPaidAsync_ShouldMarkPendingPaymentOrderAsPaidAndCommitReservation()
+    public async Task MarkOrderPaidAsync_ShouldMarkPendingPaymentOrderAsPaidWithoutCommittingReservation()
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext, out var inventoryClient);
@@ -403,10 +403,7 @@ public sealed class OrderingServiceTests
         Assert.NotNull(result.Value);
         Assert.Equal("Paid", result.Value.Status);
 
-        Assert.Single(inventoryClient.CommitRequests);
-        Assert.Equal(
-            createdOrder.Value.Items[0].InventoryReservationId,
-            inventoryClient.CommitRequests[0]);
+        Assert.Empty(inventoryClient.CommitRequests);
 
         var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
 
@@ -459,10 +456,10 @@ public sealed class OrderingServiceTests
     }
 
     [Fact]
-    public async Task MarkOrderShippedAsync_ShouldMarkPaidOrderAsShipped()
+    public async Task MarkOrderShippedAsync_ShouldMarkPaidOrderAsShippedAndCommitReservation()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out var inventoryClient);
 
         var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
 
@@ -473,6 +470,11 @@ public sealed class OrderingServiceTests
         Assert.True(shippedResult.IsSuccess);
         Assert.NotNull(shippedResult.Value);
         Assert.Equal("Shipped", shippedResult.Value.Status);
+
+        Assert.Single(inventoryClient.CommitRequests);
+        Assert.Equal(
+            createdOrder.Value.Items[0].InventoryReservationId,
+            inventoryClient.CommitRequests[0]);
 
         var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
 
@@ -504,6 +506,52 @@ public sealed class OrderingServiceTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("order_cannot_be_marked_shipped", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task MarkOrderShippedAsync_ShouldRejectAlreadyShippedOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var paidResult = await service.MarkOrderPaidAsync(createdOrder.Value!.Id);
+        var firstShippedResult = await service.MarkOrderShippedAsync(createdOrder.Value.Id);
+        var secondShippedResult = await service.MarkOrderShippedAsync(createdOrder.Value.Id);
+
+        Assert.True(paidResult.IsSuccess);
+        Assert.True(firstShippedResult.IsSuccess);
+        Assert.False(secondShippedResult.IsSuccess);
+        Assert.Equal("order_cannot_be_marked_shipped", secondShippedResult.ErrorCode);
+    }
+
+    [Fact]
+    public async Task MarkOrderShippedAsync_ShouldReject_WhenInventoryCommitFails()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+        var paidResult = await service.MarkOrderPaidAsync(createdOrder.Value!.Id);
+
+        inventoryClient.NextCommitResult =
+            InventoryClientResult<InventoryReservationDto>.Failure(
+                "inventory_reservation_commit_failed",
+                "Inventory reservation commit failed.");
+
+        var shippedResult = await service.MarkOrderShippedAsync(createdOrder.Value.Id);
+
+        Assert.True(paidResult.IsSuccess);
+        Assert.False(shippedResult.IsSuccess);
+        Assert.Equal("inventory_reservation_commit_failed", shippedResult.ErrorCode);
+
+        Assert.Single(inventoryClient.CommitRequests);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Paid", order.Status);
     }
 
     private static EfOrderingService CreateService(
@@ -563,6 +611,8 @@ public sealed class OrderingServiceTests
 
         public InventoryClientResult<InventoryReservationDto>? NextAllocateResult { get; set; }
 
+        public InventoryClientResult<InventoryReservationDto>? NextCommitResult { get; set; }
+
         public Task<InventoryClientResult<InventoryReservationDto>> AllocateStockAsync(
             AllocateStockRequest request,
             CancellationToken cancellationToken = default)
@@ -620,6 +670,14 @@ public sealed class OrderingServiceTests
             CancellationToken cancellationToken = default)
         {
             CommitRequests.Add(reservationId);
+
+            if (NextCommitResult is not null)
+            {
+                var result = NextCommitResult;
+                NextCommitResult = null;
+
+                return Task.FromResult(result);
+            }
 
             var reservation = new InventoryReservationDto(
                 Id: reservationId,

@@ -277,8 +277,8 @@ public sealed class EfOrderingService : IOrderingService
     }
 
     public async Task<OrderingResult<OrderDetailsDto>> MarkOrderPaidAsync(
-    Guid orderId,
-    CancellationToken cancellationToken = default)
+        Guid orderId,
+        CancellationToken cancellationToken = default)
     {
         var order = await _dbContext.Orders
             .Include(order => order.Items)
@@ -298,25 +298,6 @@ public sealed class EfOrderingService : IOrderingService
                 "Only pending payment orders can be marked as paid.");
         }
 
-        foreach (var item in order.Items)
-        {
-            if (item.InventoryReservationId is null)
-            {
-                continue;
-            }
-
-            var commitResult = await _inventoryClient.CommitReservationAsync(
-                item.InventoryReservationId.Value,
-                cancellationToken);
-
-            if (!commitResult.IsSuccess)
-            {
-                return OrderingResult<OrderDetailsDto>.Failure(
-                    commitResult.ErrorCode ?? "inventory_reservation_commit_failed",
-                    commitResult.ErrorMessage ?? "Inventory reservation commit failed.");
-            }
-        }
-
         order.Status = OrderStatus.Paid;
         order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -326,8 +307,8 @@ public sealed class EfOrderingService : IOrderingService
     }
 
     public async Task<OrderingResult<OrderDetailsDto>> MarkOrderShippedAsync(
-    Guid orderId,
-    CancellationToken cancellationToken = default)
+        Guid orderId,
+        CancellationToken cancellationToken = default)
     {
         var order = await _dbContext.Orders
             .Include(order => order.Items)
@@ -345,6 +326,25 @@ public sealed class EfOrderingService : IOrderingService
             return OrderingResult<OrderDetailsDto>.Failure(
                 "order_cannot_be_marked_shipped",
                 "Only paid orders can be marked as shipped.");
+        }
+
+        foreach (var item in order.Items)
+        {
+            if (item.InventoryReservationId is null)
+            {
+                continue;
+            }
+
+            var commitResult = await _inventoryClient.CommitReservationAsync(
+                item.InventoryReservationId.Value,
+                cancellationToken);
+
+            if (!commitResult.IsSuccess)
+            {
+                return OrderingResult<OrderDetailsDto>.Failure(
+                    commitResult.ErrorCode ?? "inventory_reservation_commit_failed",
+                    commitResult.ErrorMessage ?? "Inventory reservation commit failed.");
+            }
         }
 
         order.Status = OrderStatus.Shipped;
