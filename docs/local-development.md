@@ -129,6 +129,49 @@ dotnet test services/fulfillment/Fulfillment.sln
 
 ---
 
+## Smoke scripts
+
+Smoke scripts are executable local checks for multi-service flows.
+They require Docker Compose services to be running and they mutate local development databases by creating orders, payments, shipments and changing inventory stock.
+Use them after rebuilding services or changing cross-service lifecycle behavior.
+
+```bash
+./scripts/smoke/ordering-retry-smoke.sh
+./scripts/smoke/checkout-payment-fulfillment-smoke.sh
+./scripts/smoke/inventory-reservation-idempotency-smoke.sh
+```
+
+The scripts support environment variable overrides:
+
+```bash
+SKU=ARM-BLK \
+PRODUCT_VARIANT_ID=9572fb9d-f059-401e-9041-7fc75f8cb414 \
+./scripts/smoke/ordering-retry-smoke.sh
+```
+
+Current smoke coverage:
+
+```text
+ordering-retry-smoke.sh
+  Checks retry-safe Ordering mark-paid and mark-shipped behavior.
+  Verifies that Inventory stock is committed only once.
+
+checkout-payment-fulfillment-smoke.sh
+  Checks the full Checkout -> Payment -> Fulfillment flow.
+  Verifies that Payment marks the order as Paid, Fulfillment ships it,
+  and Inventory stock is committed on shipment.
+
+inventory-reservation-idempotency-smoke.sh
+  Checks Inventory reservation terminal-state behavior.
+  Verifies release retry, commit retry and invalid opposite terminal transitions.
+```
+
+`.http` files are still useful for manual API exploration.
+
+Smoke scripts are preferred for repeatable cross-service checks with dynamic IDs and assertions.
+
+---
+
 ## Manual checks
 
 ```text
