@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddHttpClient<IOrderingClient, HttpOrderingClient>(client =>
         {
             client.BaseAddress = new Uri(orderingApiBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(5);
         });
 
         return services;

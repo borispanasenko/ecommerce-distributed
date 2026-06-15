@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using Fulfillment.Application.Ordering;
 
 namespace Fulfillment.Infrastructure.Ordering;
@@ -16,53 +17,95 @@ public sealed class HttpOrderingClient : IOrderingClient
         Guid orderId,
         CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetAsync(
-            $"/api/orders/{orderId}",
-            cancellationToken);
-
-        if (response.IsSuccessStatusCode)
+        try
         {
-            var order = await response.Content.ReadFromJsonAsync<OrderingOrderDto>(
-                cancellationToken: cancellationToken);
+            var response = await _httpClient.GetAsync(
+                $"/api/orders/{orderId}",
+                cancellationToken);
 
-            if (order is null)
+            if (response.IsSuccessStatusCode)
             {
-                return OrderingClientResult<OrderingOrderDto>.Failure(
-                    "ordering_order_response_invalid",
-                    "Ordering returned an invalid order response.");
+                var order = await response.Content.ReadFromJsonAsync<OrderingOrderDto>(
+                    cancellationToken: cancellationToken);
+
+                if (order is null)
+                {
+                    return OrderingClientResult<OrderingOrderDto>.Failure(
+                        "ordering_order_response_invalid",
+                        "Ordering returned an invalid order response.");
+                }
+
+                return OrderingClientResult<OrderingOrderDto>.Success(order);
             }
 
-            return OrderingClientResult<OrderingOrderDto>.Success(order);
+            var error = await response.Content.ReadFromJsonAsync<ApiError>(
+                cancellationToken: cancellationToken);
+
+            return OrderingClientResult<OrderingOrderDto>.Failure(
+                error?.Error ?? "ordering_get_order_failed",
+                error?.Message ?? "Ordering get-order request failed.");
         }
-
-        var error = await response.Content.ReadFromJsonAsync<ApiError>(
-            cancellationToken: cancellationToken);
-
-        return OrderingClientResult<OrderingOrderDto>.Failure(
-            error?.Error ?? "ordering_get_order_failed",
-            error?.Message ?? "Ordering get-order request failed.");
+        catch (HttpRequestException)
+        {
+            return OrderingClientResult<OrderingOrderDto>.Failure(
+                "ordering_unavailable",
+                "Ordering API is unavailable.");
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return OrderingClientResult<OrderingOrderDto>.Failure(
+                "ordering_timeout",
+                "Ordering API request timed out.");
+        }
+        catch (JsonException)
+        {
+            return OrderingClientResult<OrderingOrderDto>.Failure(
+                "ordering_response_invalid",
+                "Ordering API returned an invalid JSON response.");
+        }
     }
 
     public async Task<OrderingClientResult> MarkOrderShippedAsync(
         Guid orderId,
         CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.PostAsync(
-            $"/api/orders/{orderId}/mark-shipped",
-            content: null,
-            cancellationToken);
-
-        if (response.IsSuccessStatusCode)
+        try
         {
-            return OrderingClientResult.Success();
+            var response = await _httpClient.PostAsync(
+                $"/api/orders/{orderId}/mark-shipped",
+                content: null,
+                cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return OrderingClientResult.Success();
+            }
+
+            var error = await response.Content.ReadFromJsonAsync<ApiError>(
+                cancellationToken: cancellationToken);
+
+            return OrderingClientResult.Failure(
+                error?.Error ?? "ordering_mark_shipped_failed",
+                error?.Message ?? "Ordering mark-shipped request failed.");
         }
-
-        var error = await response.Content.ReadFromJsonAsync<ApiError>(
-            cancellationToken: cancellationToken);
-
-        return OrderingClientResult.Failure(
-            error?.Error ?? "ordering_mark_shipped_failed",
-            error?.Message ?? "Ordering mark-shipped request failed.");
+        catch (HttpRequestException)
+        {
+            return OrderingClientResult.Failure(
+                "ordering_unavailable",
+                "Ordering API is unavailable.");
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return OrderingClientResult.Failure(
+                "ordering_timeout",
+                "Ordering API request timed out.");
+        }
+        catch (JsonException)
+        {
+            return OrderingClientResult.Failure(
+                "ordering_response_invalid",
+                "Ordering API returned an invalid JSON response.");
+        }
     }
 
     private sealed record ApiError(

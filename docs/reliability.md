@@ -140,6 +140,36 @@ a retry can call mark-shipped again.
 Ordering should return success if the order is already Shipped.
 ```
 
+## HTTP client resilience
+
+All service-to-service HTTP clients use explicit timeouts.
+
+Network failures, downstream unavailability, request timeouts and invalid JSON responses are mapped to controlled client result failures instead of leaking raw HTTP exceptions into application services.
+
+Automatic retries are not enabled globally.
+
+Retries should only be added for commands that are already retry-safe or idempotent.
+
+Current retry-safe commands:
+
+```text
+Payment -> Ordering mark-paid
+Fulfillment -> Ordering mark-shipped
+Ordering -> Inventory release reservation
+Ordering -> Inventory commit reservation
+```
+
+Current commands without automatic retry:
+
+```text
+Ordering -> Inventory allocate reservation
+Create order
+Create payment
+Create shipment
+```
+
+Inventory allocation is not retried automatically because allocation is not idempotent yet.
+
 ## Future work
 
 ```text

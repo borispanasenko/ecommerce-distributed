@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using Ordering.Application.Inventory;
 
 namespace Ordering.Infrastructure.Inventory;
@@ -16,96 +17,94 @@ public sealed class HttpInventoryClient : IInventoryClient
         AllocateStockRequest request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.PostAsJsonAsync(
-            "/api/stock/reservations/allocate",
-            request,
+        return await SendReservationRequestAsync(
+            async () => await _httpClient.PostAsJsonAsync(
+                "/api/stock/reservations/allocate",
+                request,
+                cancellationToken),
+            "inventory_allocation_failed",
+            "Inventory stock allocation failed.",
             cancellationToken);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var reservation = await response.Content.ReadFromJsonAsync<InventoryReservationDto>(
-                cancellationToken: cancellationToken);
-
-            if (reservation is null)
-            {
-                return InventoryClientResult<InventoryReservationDto>.Failure(
-                    "inventory_empty_response",
-                    "Inventory returned an empty reservation response.");
-            }
-
-            return InventoryClientResult<InventoryReservationDto>.Success(reservation);
-        }
-
-        var error = await response.Content.ReadFromJsonAsync<InventoryErrorResponse>(
-            cancellationToken: cancellationToken);
-
-        return InventoryClientResult<InventoryReservationDto>.Failure(
-            error?.Error ?? "inventory_allocation_failed",
-            error?.Message ?? "Inventory stock allocation failed.");
     }
 
     public async Task<InventoryClientResult<InventoryReservationDto>> ReleaseReservationAsync(
         Guid reservationId,
         CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.PostAsync(
-            $"/api/stock/reservations/{reservationId}/release",
-            content: null,
+        return await SendReservationRequestAsync(
+            async () => await _httpClient.PostAsync(
+                $"/api/stock/reservations/{reservationId}/release",
+                content: null,
+                cancellationToken),
+            "inventory_release_failed",
+            "Inventory reservation release failed.",
             cancellationToken);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var reservation = await response.Content.ReadFromJsonAsync<InventoryReservationDto>(
-                cancellationToken: cancellationToken);
-
-            if (reservation is null)
-            {
-                return InventoryClientResult<InventoryReservationDto>.Failure(
-                    "inventory_empty_response",
-                    "Inventory returned an empty reservation response.");
-            }
-
-            return InventoryClientResult<InventoryReservationDto>.Success(reservation);
-        }
-
-        var error = await response.Content.ReadFromJsonAsync<InventoryErrorResponse>(
-            cancellationToken: cancellationToken);
-
-        return InventoryClientResult<InventoryReservationDto>.Failure(
-            error?.Error ?? "inventory_release_failed",
-            error?.Message ?? "Inventory reservation release failed.");
     }
 
     public async Task<InventoryClientResult<InventoryReservationDto>> CommitReservationAsync(
-    Guid reservationId,
-    CancellationToken cancellationToken = default)
+        Guid reservationId,
+        CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.PostAsync(
-            $"/api/stock/reservations/{reservationId}/commit",
-            content: null,
+        return await SendReservationRequestAsync(
+            async () => await _httpClient.PostAsync(
+                $"/api/stock/reservations/{reservationId}/commit",
+                content: null,
+                cancellationToken),
+            "inventory_commit_failed",
+            "Inventory reservation commit failed.",
             cancellationToken);
+    }
 
-        if (response.IsSuccessStatusCode)
+    private static async Task<InventoryClientResult<InventoryReservationDto>> SendReservationRequestAsync(
+        Func<Task<HttpResponseMessage>> sendRequest,
+        string fallbackErrorCode,
+        string fallbackErrorMessage,
+        CancellationToken cancellationToken)
+    {
+        try
         {
-            var reservation = await response.Content.ReadFromJsonAsync<InventoryReservationDto>(
-                cancellationToken: cancellationToken);
+            var response = await sendRequest();
 
-            if (reservation is null)
+            if (response.IsSuccessStatusCode)
             {
-                return InventoryClientResult<InventoryReservationDto>.Failure(
-                    "inventory_empty_response",
-                    "Inventory returned an empty reservation response.");
+                var reservation = await response.Content.ReadFromJsonAsync<InventoryReservationDto>(
+                    cancellationToken: cancellationToken);
+
+                if (reservation is null)
+                {
+                    return InventoryClientResult<InventoryReservationDto>.Failure(
+                        "inventory_empty_response",
+                        "Inventory returned an empty reservation response.");
+                }
+
+                return InventoryClientResult<InventoryReservationDto>.Success(reservation);
             }
 
-            return InventoryClientResult<InventoryReservationDto>.Success(reservation);
+            var error = await response.Content.ReadFromJsonAsync<InventoryErrorResponse>(
+                cancellationToken: cancellationToken);
+
+            return InventoryClientResult<InventoryReservationDto>.Failure(
+                error?.Error ?? fallbackErrorCode,
+                error?.Message ?? fallbackErrorMessage);
         }
-
-        var error = await response.Content.ReadFromJsonAsync<InventoryErrorResponse>(
-            cancellationToken: cancellationToken);
-
-        return InventoryClientResult<InventoryReservationDto>.Failure(
-            error?.Error ?? "inventory_commit_failed",
-            error?.Message ?? "Inventory reservation commit failed.");
+        catch (HttpRequestException)
+        {
+            return InventoryClientResult<InventoryReservationDto>.Failure(
+                "inventory_unavailable",
+                "Inventory API is unavailable.");
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return InventoryClientResult<InventoryReservationDto>.Failure(
+                "inventory_timeout",
+                "Inventory API request timed out.");
+        }
+        catch (JsonException)
+        {
+            return InventoryClientResult<InventoryReservationDto>.Failure(
+                "inventory_response_invalid",
+                "Inventory API returned an invalid JSON response.");
+        }
     }
 
     private sealed record InventoryErrorResponse(

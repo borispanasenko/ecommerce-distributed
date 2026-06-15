@@ -50,11 +50,13 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(baseUrl);
+            client.Timeout = TimeSpan.FromSeconds(5);
         });
 
         services.AddHttpClient<IInventoryClient, HttpInventoryClient>(client =>
         {
             client.BaseAddress = new Uri(inventoryApiBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(5);
         });
 
         return services;

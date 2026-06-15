@@ -24,6 +24,7 @@ public static class DependencyInjection
                 ?? throw new InvalidOperationException("OrderingApi:BaseUrl is not configured.");
 
             client.BaseAddress = new Uri(baseUrl);
+            client.Timeout = TimeSpan.FromSeconds(5);
         });
 
         services.AddScoped<IFulfillmentService, EfFulfillmentService>();
