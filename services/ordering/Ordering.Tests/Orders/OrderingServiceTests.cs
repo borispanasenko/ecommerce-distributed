@@ -440,10 +440,10 @@ public sealed class OrderingServiceTests
     }
 
     [Fact]
-    public async Task MarkOrderPaidAsync_ShouldRejectAlreadyPaidOrder()
+    public async Task MarkOrderPaidAsync_ShouldBeIdempotent_WhenOrderAlreadyPaid()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out var inventoryClient);
 
         var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
 
@@ -451,8 +451,44 @@ public sealed class OrderingServiceTests
         var secondResult = await service.MarkOrderPaidAsync(createdOrder.Value.Id);
 
         Assert.True(firstResult.IsSuccess);
-        Assert.False(secondResult.IsSuccess);
-        Assert.Equal("order_cannot_be_marked_paid", secondResult.ErrorCode);
+        Assert.True(secondResult.IsSuccess);
+
+        Assert.NotNull(secondResult.Value);
+        Assert.Equal("Paid", secondResult.Value.Status);
+
+        Assert.Empty(inventoryClient.CommitRequests);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Paid", order.Status);
+    }
+
+    [Fact]
+    public async Task MarkOrderPaidAsync_ShouldBeIdempotent_WhenOrderAlreadyShipped()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var paidResult = await service.MarkOrderPaidAsync(createdOrder.Value!.Id);
+        var shippedResult = await service.MarkOrderShippedAsync(createdOrder.Value.Id);
+        var secondPaidResult = await service.MarkOrderPaidAsync(createdOrder.Value.Id);
+
+        Assert.True(paidResult.IsSuccess);
+        Assert.True(shippedResult.IsSuccess);
+        Assert.True(secondPaidResult.IsSuccess);
+
+        Assert.NotNull(secondPaidResult.Value);
+        Assert.Equal("Shipped", secondPaidResult.Value.Status);
+
+        Assert.Single(inventoryClient.CommitRequests);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Shipped", order.Status);
     }
 
     [Fact]
@@ -509,10 +545,10 @@ public sealed class OrderingServiceTests
     }
 
     [Fact]
-    public async Task MarkOrderShippedAsync_ShouldRejectAlreadyShippedOrder()
+    public async Task MarkOrderShippedAsync_ShouldBeIdempotent_WhenOrderAlreadyShipped()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out var inventoryClient);
 
         var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
 
@@ -522,8 +558,17 @@ public sealed class OrderingServiceTests
 
         Assert.True(paidResult.IsSuccess);
         Assert.True(firstShippedResult.IsSuccess);
-        Assert.False(secondShippedResult.IsSuccess);
-        Assert.Equal("order_cannot_be_marked_shipped", secondShippedResult.ErrorCode);
+        Assert.True(secondShippedResult.IsSuccess);
+
+        Assert.NotNull(secondShippedResult.Value);
+        Assert.Equal("Shipped", secondShippedResult.Value.Status);
+
+        Assert.Single(inventoryClient.CommitRequests);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Shipped", order.Status);
     }
 
     [Fact]

@@ -291,6 +291,11 @@ public sealed class EfOrderingService : IOrderingService
                 "Order was not found.");
         }
 
+        if (order.Status is OrderStatus.Paid or OrderStatus.Shipped)
+        {
+            return OrderingResult<OrderDetailsDto>.Success(ToDetailsDto(order));
+        }
+
         if (order.Status != OrderStatus.PendingPayment)
         {
             return OrderingResult<OrderDetailsDto>.Failure(
@@ -319,6 +324,11 @@ public sealed class EfOrderingService : IOrderingService
             return OrderingResult<OrderDetailsDto>.Failure(
                 "order_not_found",
                 "Order was not found.");
+        }
+
+        if (order.Status == OrderStatus.Shipped)
+        {
+            return OrderingResult<OrderDetailsDto>.Success(ToDetailsDto(order));
         }
 
         if (order.Status != OrderStatus.Paid)
