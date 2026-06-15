@@ -485,6 +485,11 @@ public sealed class EfInventoryStockService : IInventoryStockService
                 "Reservation was not found.");
         }
 
+        if (reservation.Status == StockReservationStatus.Released)
+        {
+            return InventoryResult<StockReservationDto>.Success(ToReservationDto(reservation));
+        }
+
         if (reservation.Status != StockReservationStatus.Active)
         {
             return InventoryResult<StockReservationDto>.Failure(
@@ -557,6 +562,11 @@ public sealed class EfInventoryStockService : IInventoryStockService
             return InventoryResult<StockReservationDto>.Failure(
                 "reservation_not_found",
                 "Reservation was not found.");
+        }
+
+        if (reservation.Status == StockReservationStatus.Committed)
+        {
+            return InventoryResult<StockReservationDto>.Success(ToReservationDto(reservation));
         }
 
         if (reservation.Status != StockReservationStatus.Active)
