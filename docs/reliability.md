@@ -173,11 +173,7 @@ Inventory allocation is not retried automatically because allocation is not idem
 ## Future work
 
 ```text
-Add explicit retry policies for HTTP clients.
-Add timeout policies for service-to-service calls.
-Add idempotency keys for external commands where needed.
-Add outbox/inbox before publishing business events through RabbitMQ.
-Add choreography-based saga after lifecycle commands are retry-safe.
+Add selective retry policies for retry-safe HTTP commands. Tune timeout values per downstream dependency if needed. Add idempotency keys for non-idempotent external commands where needed. Add outbox/inbox before publishing business events through RabbitMQ. Add choreography-based saga after lifecycle commands are retry-safe.
 ```
 
 ## Guiding rule
