@@ -84,6 +84,7 @@ Order lifecycle:
 ```text
 PendingPayment -> Paid -> Shipped
 PendingPayment -> Cancelled
+PendingPayment -> Expired
 ```
 
 Retry policy:
@@ -94,6 +95,12 @@ Mark-paid already Paid order    -> success, no-op
 Mark-paid already Shipped order -> success, no-op
 Mark-paid Cancelled order       -> failure
 
+Expire PendingPayment order     -> success, Inventory reservation is released
+Expire already Expired          -> success, no-op
+Expire Paid order               -> failure
+Expire Shipped order            -> failure
+Expire Cancelled order          -> failure
+
 Mark-shipped Paid order         -> success, Inventory reservation is committed
 Mark-shipped already Shipped    -> success, no-op
 Mark-shipped PendingPayment     -> failure
@@ -103,6 +110,8 @@ Mark-shipped Cancelled          -> failure
 `Mark-paid already Shipped` can be treated as success because a Shipped order has already passed through the Paid lifecycle state.
 
 `Mark-shipped already Shipped` can be treated as success because the target state has already been reached.
+
+Expired means the order was not paid in time and its Inventory reservation has been released.
 
 ## Payment commands
 
@@ -153,6 +162,7 @@ Retries should only be added for commands that are already retry-safe or idempot
 Current retry-safe commands:
 
 ```text
+Ordering expire order
 Payment -> Ordering mark-paid
 Fulfillment -> Ordering mark-shipped
 Ordering -> Inventory release reservation

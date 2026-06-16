@@ -83,6 +83,27 @@ public static class OrderingEndpoints
         .WithName("CancelOrder")
         .WithOpenApi();
 
+        orders.MapPost("/{orderId:guid}/expire", async (
+            Guid orderId,
+            IOrderingService orderingService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await orderingService.ExpireOrderAsync(orderId, cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(new
+                {
+                    error = result.ErrorCode,
+                    message = result.ErrorMessage
+                });
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .WithName("ExpireOrder")
+        .WithOpenApi();
+
         orders.MapPost("/{orderId:guid}/mark-paid", async (
             Guid orderId,
             IOrderingService orderingService,

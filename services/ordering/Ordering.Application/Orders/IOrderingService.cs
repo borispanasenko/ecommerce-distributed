@@ -17,6 +17,10 @@ public interface IOrderingService
         Guid orderId,
         CancellationToken cancellationToken = default);
 
+    Task<OrderingResult<OrderDetailsDto>> ExpireOrderAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default);
+
     Task<OrderingResult<OrderDetailsDto>> MarkOrderPaidAsync(
         Guid orderId,
         CancellationToken cancellationToken = default);

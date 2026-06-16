@@ -249,26 +249,56 @@ public sealed class EfOrderingService : IOrderingService
                 "Only pending payment orders can be cancelled.");
         }
 
-        foreach (var item in order.Items)
+        var releaseFailure = await ReleaseInventoryReservationsAsync(order, cancellationToken);
+
+        if (releaseFailure is not null)
         {
-            if (item.InventoryReservationId is null)
-            {
-                continue;
-            }
-
-            var releaseResult = await _inventoryClient.ReleaseReservationAsync(
-                item.InventoryReservationId.Value,
-                cancellationToken);
-
-            if (!releaseResult.IsSuccess)
-            {
-                return OrderingResult<OrderDetailsDto>.Failure(
-                    releaseResult.ErrorCode ?? "inventory_reservation_release_failed",
-                    releaseResult.ErrorMessage ?? "Inventory reservation release failed.");
-            }
+            return releaseFailure;
         }
 
         order.Status = OrderStatus.Cancelled;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return OrderingResult<OrderDetailsDto>.Success(ToDetailsDto(order));
+    }
+
+    public async Task<OrderingResult<OrderDetailsDto>> ExpireOrderAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        var order = await _dbContext.Orders
+            .Include(order => order.Items)
+            .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
+
+        if (order is null)
+        {
+            return OrderingResult<OrderDetailsDto>.Failure(
+                "order_not_found",
+                "Order was not found.");
+        }
+
+        if (order.Status == OrderStatus.Expired)
+        {
+            return OrderingResult<OrderDetailsDto>.Success(ToDetailsDto(order));
+        }
+
+        if (order.Status != OrderStatus.PendingPayment)
+        {
+            return OrderingResult<OrderDetailsDto>.Failure(
+                "order_cannot_be_expired",
+                "Only pending payment orders can be expired.");
+        }
+
+        var releaseFailure = await ReleaseInventoryReservationsAsync(order, cancellationToken);
+
+        if (releaseFailure is not null)
+        {
+            return releaseFailure;
+        }
+
+        order.Status = OrderStatus.Expired;
         order.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -391,6 +421,32 @@ public sealed class EfOrderingService : IOrderingService
                     item.LineTotalAmountMinor,
                     item.InventoryReservationId))
                 .ToList());
+    }
+
+    private async Task<OrderingResult<OrderDetailsDto>?> ReleaseInventoryReservationsAsync(
+        Order order,
+        CancellationToken cancellationToken)
+    {
+        foreach (var item in order.Items)
+        {
+            if (item.InventoryReservationId is null)
+            {
+                continue;
+            }
+
+            var releaseResult = await _inventoryClient.ReleaseReservationAsync(
+                item.InventoryReservationId.Value,
+                cancellationToken);
+
+            if (!releaseResult.IsSuccess)
+            {
+                return OrderingResult<OrderDetailsDto>.Failure(
+                    releaseResult.ErrorCode ?? "inventory_reservation_release_failed",
+                    releaseResult.ErrorMessage ?? "Inventory reservation release failed.");
+            }
+        }
+
+        return null;
     }
 
     private sealed record ResolvedOrderItem(

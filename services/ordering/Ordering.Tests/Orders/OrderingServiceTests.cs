@@ -390,6 +390,166 @@ public sealed class OrderingServiceTests
     }
 
     [Fact]
+    public async Task ExpireOrderAsync_ShouldExpirePendingPaymentOrderAndReleaseReservation()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var result = await service.ExpireOrderAsync(createdOrder.Value!.Id);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("Expired", result.Value.Status);
+
+        Assert.Single(inventoryClient.ReleaseRequests);
+        Assert.Equal(
+            createdOrder.Value.Items[0].InventoryReservationId,
+            inventoryClient.ReleaseRequests[0]);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Expired", order.Status);
+    }
+
+    [Fact]
+    public async Task ExpireOrderAsync_ShouldBeIdempotent_WhenOrderAlreadyExpired()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var firstResult = await service.ExpireOrderAsync(createdOrder.Value!.Id);
+        var secondResult = await service.ExpireOrderAsync(createdOrder.Value.Id);
+
+        Assert.True(firstResult.IsSuccess);
+        Assert.True(secondResult.IsSuccess);
+
+        Assert.NotNull(secondResult.Value);
+        Assert.Equal("Expired", secondResult.Value.Status);
+
+        Assert.Single(inventoryClient.ReleaseRequests);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Expired", order.Status);
+    }
+
+    [Fact]
+    public async Task ExpireOrderAsync_ShouldRejectMissingOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+
+        var result = await service.ExpireOrderAsync(Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("order_not_found", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task ExpireOrderAsync_ShouldRejectPaidOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var paidResult = await service.MarkOrderPaidAsync(createdOrder.Value!.Id);
+        var expireResult = await service.ExpireOrderAsync(createdOrder.Value.Id);
+
+        Assert.True(paidResult.IsSuccess);
+        Assert.False(expireResult.IsSuccess);
+        Assert.Equal("order_cannot_be_expired", expireResult.ErrorCode);
+
+        Assert.Empty(inventoryClient.ReleaseRequests);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Paid", order.Status);
+    }
+
+    [Fact]
+    public async Task ExpireOrderAsync_ShouldRejectShippedOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var paidResult = await service.MarkOrderPaidAsync(createdOrder.Value!.Id);
+        var shippedResult = await service.MarkOrderShippedAsync(createdOrder.Value.Id);
+        var expireResult = await service.ExpireOrderAsync(createdOrder.Value.Id);
+
+        Assert.True(paidResult.IsSuccess);
+        Assert.True(shippedResult.IsSuccess);
+        Assert.False(expireResult.IsSuccess);
+        Assert.Equal("order_cannot_be_expired", expireResult.ErrorCode);
+
+        Assert.Empty(inventoryClient.ReleaseRequests);
+        Assert.Single(inventoryClient.CommitRequests);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Shipped", order.Status);
+    }
+
+    [Fact]
+    public async Task ExpireOrderAsync_ShouldRejectCancelledOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var cancelResult = await service.CancelOrderAsync(createdOrder.Value!.Id);
+        var expireResult = await service.ExpireOrderAsync(createdOrder.Value.Id);
+
+        Assert.True(cancelResult.IsSuccess);
+        Assert.False(expireResult.IsSuccess);
+        Assert.Equal("order_cannot_be_expired", expireResult.ErrorCode);
+
+        Assert.Single(inventoryClient.ReleaseRequests);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("Cancelled", order.Status);
+    }
+
+    [Fact]
+    public async Task ExpireOrderAsync_ShouldReject_WhenInventoryReleaseFails()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var createdOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        inventoryClient.NextReleaseResult =
+            InventoryClientResult<InventoryReservationDto>.Failure(
+                "inventory_reservation_release_failed",
+                "Inventory reservation release failed.");
+
+        var expireResult = await service.ExpireOrderAsync(createdOrder.Value!.Id);
+
+        Assert.False(expireResult.IsSuccess);
+        Assert.Equal("inventory_reservation_release_failed", expireResult.ErrorCode);
+
+        Assert.Single(inventoryClient.ReleaseRequests);
+
+        var order = await service.GetOrderByIdAsync(createdOrder.Value.Id);
+
+        Assert.NotNull(order);
+        Assert.Equal("PendingPayment", order.Status);
+    }
+
+    [Fact]
     public async Task MarkOrderPaidAsync_ShouldMarkPendingPaymentOrderAsPaidWithoutCommittingReservation()
     {
         await using var dbContext = CreateDbContext();
@@ -656,6 +816,8 @@ public sealed class OrderingServiceTests
 
         public InventoryClientResult<InventoryReservationDto>? NextAllocateResult { get; set; }
 
+        public InventoryClientResult<InventoryReservationDto>? NextReleaseResult { get; set; }
+
         public InventoryClientResult<InventoryReservationDto>? NextCommitResult { get; set; }
 
         public Task<InventoryClientResult<InventoryReservationDto>> AllocateStockAsync(
@@ -693,6 +855,14 @@ public sealed class OrderingServiceTests
             CancellationToken cancellationToken = default)
         {
             ReleaseRequests.Add(reservationId);
+
+            if (NextReleaseResult is not null)
+            {
+                var result = NextReleaseResult;
+                NextReleaseResult = null;
+
+                return Task.FromResult(result);
+            }
 
             var reservation = new InventoryReservationDto(
                 Id: reservationId,
