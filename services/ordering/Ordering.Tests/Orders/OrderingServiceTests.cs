@@ -550,6 +550,118 @@ public sealed class OrderingServiceTests
     }
 
     [Fact]
+    public async Task ExpirePendingPaymentOrdersAsync_ShouldExpireOldPendingPaymentOrders()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var oldOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+        var freshOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+        var paidOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        Assert.True(oldOrder.IsSuccess);
+        Assert.NotNull(oldOrder.Value);
+        Assert.True(freshOrder.IsSuccess);
+        Assert.NotNull(freshOrder.Value);
+        Assert.True(paidOrder.IsSuccess);
+        Assert.NotNull(paidOrder.Value);
+
+        var oldOrderId = oldOrder.Value.Id;
+        var freshOrderId = freshOrder.Value.Id;
+        var paidOrderId = paidOrder.Value.Id;
+        var oldOrderReservationId = oldOrder.Value.Items[0].InventoryReservationId;
+
+        var oldOrderEntity = await dbContext.Orders
+            .FirstAsync(order => order.Id == oldOrderId);
+
+        oldOrderEntity.CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-30);
+        oldOrderEntity.UpdatedAt = oldOrderEntity.CreatedAt;
+
+        await service.MarkOrderPaidAsync(paidOrderId);
+
+        await dbContext.SaveChangesAsync();
+
+        var result = await service.ExpirePendingPaymentOrdersAsync(
+            expiresBefore: DateTimeOffset.UtcNow.AddMinutes(-15),
+            batchSize: 50);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(1, result.Value.CheckedCount);
+        Assert.Equal(1, result.Value.ExpiredCount);
+        Assert.Equal(0, result.Value.FailedCount);
+
+        Assert.Single(inventoryClient.ReleaseRequests);
+        Assert.Equal(
+            oldOrderReservationId,
+            inventoryClient.ReleaseRequests[0]);
+
+        var oldOrderAfterExpiration = await service.GetOrderByIdAsync(oldOrderId);
+        var freshOrderAfterExpiration = await service.GetOrderByIdAsync(freshOrderId);
+        var paidOrderAfterExpiration = await service.GetOrderByIdAsync(paidOrderId);
+
+        Assert.NotNull(oldOrderAfterExpiration);
+        Assert.NotNull(freshOrderAfterExpiration);
+        Assert.NotNull(paidOrderAfterExpiration);
+
+        Assert.Equal("Expired", oldOrderAfterExpiration.Status);
+        Assert.Equal("PendingPayment", freshOrderAfterExpiration.Status);
+        Assert.Equal("Paid", paidOrderAfterExpiration.Status);
+    }
+
+    [Fact]
+    public async Task ExpirePendingPaymentOrdersAsync_ShouldRespectBatchSize()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var inventoryClient);
+
+        var firstOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+        var secondOrder = await service.CreateOrderAsync(CreateValidOrderRequest());
+
+        var oldCreatedAt = DateTimeOffset.UtcNow.AddMinutes(-30);
+
+        var orders = await dbContext.Orders
+            .Where(order =>
+                order.Id == firstOrder.Value!.Id ||
+                order.Id == secondOrder.Value!.Id)
+            .ToListAsync();
+
+        foreach (var order in orders)
+        {
+            order.CreatedAt = oldCreatedAt;
+            order.UpdatedAt = oldCreatedAt;
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var result = await service.ExpirePendingPaymentOrdersAsync(
+            expiresBefore: DateTimeOffset.UtcNow.AddMinutes(-15),
+            batchSize: 1);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(1, result.Value.CheckedCount);
+        Assert.Equal(1, result.Value.ExpiredCount);
+        Assert.Equal(0, result.Value.FailedCount);
+
+        Assert.Single(inventoryClient.ReleaseRequests);
+    }
+
+    [Fact]
+    public async Task ExpirePendingPaymentOrdersAsync_ShouldRejectInvalidBatchSize()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+
+        var result = await service.ExpirePendingPaymentOrdersAsync(
+            expiresBefore: DateTimeOffset.UtcNow,
+            batchSize: 0);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("batch_size_invalid", result.ErrorCode);
+    }
+
+    [Fact]
     public async Task MarkOrderPaidAsync_ShouldMarkPendingPaymentOrderAsPaidWithoutCommittingReservation()
     {
         await using var dbContext = CreateDbContext();

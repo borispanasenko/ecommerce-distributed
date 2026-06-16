@@ -306,6 +306,51 @@ public sealed class EfOrderingService : IOrderingService
         return OrderingResult<OrderDetailsDto>.Success(ToDetailsDto(order));
     }
 
+    public async Task<OrderingResult<OrderExpirationBatchDto>> ExpirePendingPaymentOrdersAsync(
+        DateTimeOffset expiresBefore,
+        int batchSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (batchSize <= 0)
+        {
+            return OrderingResult<OrderExpirationBatchDto>.Failure(
+                "batch_size_invalid",
+                "Batch size must be greater than zero.");
+        }
+
+        var orderIds = await _dbContext.Orders
+            .AsNoTracking()
+            .Where(order =>
+                order.Status == OrderStatus.PendingPayment &&
+                order.CreatedAt <= expiresBefore)
+            .OrderBy(order => order.CreatedAt)
+            .Select(order => order.Id)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
+
+        var expiredCount = 0;
+        var failedCount = 0;
+
+        foreach (var orderId in orderIds)
+        {
+            var expireResult = await ExpireOrderAsync(orderId, cancellationToken);
+
+            if (expireResult.IsSuccess)
+            {
+                expiredCount++;
+                continue;
+            }
+
+            failedCount++;
+        }
+
+        return OrderingResult<OrderExpirationBatchDto>.Success(
+            new OrderExpirationBatchDto(
+                CheckedCount: orderIds.Count,
+                ExpiredCount: expiredCount,
+                FailedCount: failedCount));
+    }
+
     public async Task<OrderingResult<OrderDetailsDto>> MarkOrderPaidAsync(
         Guid orderId,
         CancellationToken cancellationToken = default)

@@ -21,6 +21,11 @@ public interface IOrderingService
         Guid orderId,
         CancellationToken cancellationToken = default);
 
+    Task<OrderingResult<OrderExpirationBatchDto>> ExpirePendingPaymentOrdersAsync(
+        DateTimeOffset expiresBefore,
+        int batchSize,
+        CancellationToken cancellationToken = default);
+
     Task<OrderingResult<OrderDetailsDto>> MarkOrderPaidAsync(
         Guid orderId,
         CancellationToken cancellationToken = default);
@@ -72,6 +77,11 @@ public sealed record OrderItemDto(
     int Quantity,
     long LineTotalAmountMinor,
     Guid? InventoryReservationId);
+
+public sealed record OrderExpirationBatchDto(
+    int CheckedCount,
+    int ExpiredCount,
+    int FailedCount);
 
 public sealed record OrderingResult<T>(
     bool IsSuccess,

@@ -1,5 +1,6 @@
 using Ordering.Infrastructure;
 using Ordering.Api.Endpoints;
+using Ordering.Api.BackgroundServices;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +20,9 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddOrderingInfrastructure(builder.Configuration);
+builder.Services.Configure<OrderExpirationOptions>(
+    builder.Configuration.GetSection(OrderExpirationOptions.SectionName));
+builder.Services.AddHostedService<OrderExpirationBackgroundService>();
 
 var app = builder.Build();
 app.UseCors("Frontend");
