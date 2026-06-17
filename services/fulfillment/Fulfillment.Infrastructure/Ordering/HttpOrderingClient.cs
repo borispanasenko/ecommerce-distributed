@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using Fulfillment.Application.Ordering;
+using Fulfillment.Infrastructure.Http;
 
 namespace Fulfillment.Infrastructure.Ordering;
 
@@ -71,9 +72,11 @@ public sealed class HttpOrderingClient : IOrderingClient
     {
         try
         {
-            var response = await _httpClient.PostAsync(
-                $"/api/orders/{orderId}/mark-shipped",
-                content: null,
+            var response = await HttpRetryPolicy.SendAsync(
+                async retryToken => await _httpClient.PostAsync(
+                    $"/api/orders/{orderId}/mark-shipped",
+                    content: null,
+                    retryToken),
                 cancellationToken);
 
             if (response.IsSuccessStatusCode)

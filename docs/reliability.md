@@ -153,6 +153,40 @@ If no successful payment happens before the timeout, the Ordering expiration wor
 
 Future payment provider webhook handling may need idempotency keys or provider reference based idempotency.
 
+## Selective HTTP retries
+
+Outbound HTTP retries are applied only to commands that are retry-safe.
+
+Current retry-enabled calls:
+
+```text
+Ordering -> Inventory release reservation
+Ordering -> Inventory commit reservation
+Payment -> Ordering mark-paid
+Fulfillment -> Ordering mark-shipped
+```
+
+Retries are intentionally not applied to create/allocation calls without an idempotency key:
+
+```text
+Ordering -> Catalog product snapshot
+Ordering -> Inventory allocate reservation
+Create order
+Create payment
+Create shipment
+```
+
+Retry policy:
+
+```text
+Max attempts: 3
+Delays: 200ms, 500ms
+Retry on: HTTP 408, HTTP 429, HTTP 5xx, HttpRequestException, timeout TaskCanceledException
+Do not retry: 400/404/business errors, caller cancellation, invalid JSON responses
+```
+
+This keeps transient network recovery separate from business validation failures.
+
 ## Fulfillment commands
 
 Fulfillment owns shipment lifecycle.
@@ -182,33 +216,17 @@ Network failures, downstream unavailability, request timeouts and invalid JSON r
 
 Automatic retries are not enabled globally.
 
-Retries should only be added for commands that are already retry-safe or idempotent.
+Selective retries are enabled only for retry-safe service-to-service commands listed above.
 
-Current retry-safe commands:
-
-```text
-Ordering expire order
-Payment -> Ordering mark-paid
-Fulfillment -> Ordering mark-shipped
-Ordering -> Inventory release reservation
-Ordering -> Inventory commit reservation
-```
-
-Current commands without automatic retry:
-
-```text
-Ordering -> Inventory allocate reservation
-Create order
-Create payment
-Create shipment
-```
-
-Inventory allocation is not retried automatically because allocation is not idempotent yet.
+Create/allocation calls without idempotency keys remain non-retried.
 
 ## Future work
 
 ```text
-Add selective retry policies for retry-safe HTTP commands. Tune timeout values per downstream dependency if needed. Add idempotency keys for non-idempotent external commands where needed. Add outbox/inbox before publishing business events through RabbitMQ. Add choreography-based saga after lifecycle commands are retry-safe.
+Tune timeout and retry values per downstream dependency if needed.
+Add idempotency keys for non-idempotent external commands where needed.
+Add outbox/inbox before publishing business events through RabbitMQ.
+Add choreography-based saga after lifecycle commands are retry-safe.
 ```
 
 ## Guiding rule

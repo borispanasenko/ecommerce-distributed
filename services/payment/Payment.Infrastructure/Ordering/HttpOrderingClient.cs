@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using Payment.Application.Ordering;
+using Payment.Infrastructure.Http;
 
 namespace Payment.Infrastructure.Ordering;
 
@@ -19,9 +20,11 @@ public sealed class HttpOrderingClient : IOrderingClient
     {
         try
         {
-            var response = await _httpClient.PostAsync(
-                $"/api/orders/{orderId}/mark-paid",
-                content: null,
+            var response = await HttpRetryPolicy.SendAsync(
+                async retryToken => await _httpClient.PostAsync(
+                    $"/api/orders/{orderId}/mark-paid",
+                    content: null,
+                    retryToken),
                 cancellationToken);
 
             if (response.IsSuccessStatusCode)
