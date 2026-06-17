@@ -83,6 +83,7 @@ Order statuses:
 | 3     | Paid           | Order was paid                       |
 | 4     | Cancelled      | Order was cancelled                  |
 | 5     | Shipped        | Order was shipped                    |
+| 6     | Expired        | Order was not paid in time           |
 
 Current implemented statuses:
 
@@ -91,12 +92,14 @@ PendingPayment
 Paid
 Cancelled
 Shipped
+Expired
 ```
 
 Notes:
 
 * Orders are currently created as `PendingPayment`.
 * Orders can be cancelled while they are in `PendingPayment`.
+* Orders can be expired while they are in `PendingPayment`.
 * Orders can be marked as `Paid` while they are in `PendingPayment`.
 * Orders can be marked as `Shipped` while they are in `Paid`.
 * `total_amount_minor` stores money in minor units.
@@ -106,6 +109,7 @@ Rules:
 
 * Order must contain at least one item.
 * Only `PendingPayment` orders can be cancelled.
+* Only `PendingPayment` orders can be expired.
 * Only `PendingPayment` orders can be marked as `Paid`.
 * Only `Paid` orders can be marked as `Shipped`.
 * `total_amount_minor` must be greater than or equal to `0`.
@@ -273,6 +277,7 @@ GET  /api/orders
 GET  /api/orders/{id}
 POST /api/orders
 POST /api/orders/{id}/cancel
+POST /api/orders/{id}/expire
 POST /api/orders/{id}/mark-paid
 POST /api/orders/{id}/mark-shipped
 ```
@@ -300,6 +305,8 @@ List orders
 Get order details
 Cancel order
 Release Inventory reservation
+Expire unpaid order
+Release Inventory reservation during expiration
 Mark order as Paid
 Keep Inventory reservation allocated while order is Paid
 Mark paid order as Shipped
@@ -329,6 +336,12 @@ If order persistence fails after reservation, Ordering tries to release created 
 Only PendingPayment orders can be cancelled.
 Cancelling an order releases Inventory reservations.
 Cancelled orders cannot be cancelled again.
+Only PendingPayment orders can be expired.
+Expiring an order releases Inventory reservations.
+Expiring an already Expired order is retry-safe success/no-op.
+If Inventory release fails during expiration, the order remains PendingPayment.
+Paid, Shipped and Cancelled orders cannot be expired.
+Ordering API runs a background worker that automatically expires old PendingPayment orders.
 Only PendingPayment orders can be marked as Paid.
 Marking an order as Paid keeps Inventory reservations allocated.
 Paid orders cannot be cancelled.
@@ -350,6 +363,7 @@ GET /api/orders/{id} returns order details.
 ```text
 Ordering allocates Inventory reservations during order creation.
 Ordering releases Inventory reservations when PendingPayment orders are cancelled.
+Ordering releases Inventory reservations when PendingPayment orders expire.
 Ordering keeps Inventory reservations allocated when orders are marked as Paid.
 Ordering commits Inventory reservations when Paid orders are marked as Shipped.
 Fulfillment triggers mark-shipped through Ordering.
@@ -368,6 +382,8 @@ Validation tests
 Order list tests
 Order details tests
 Cancel order tests
+Expire order tests
+Order expiration batch tests
 Mark paid tests
 Mark shipped tests
 Inventory reservation commit on mark-shipped tests
@@ -379,7 +395,8 @@ Future work:
 
 ```text
 Handle payment failure effects on order lifecycle.
-Add reservation expiration flow for unpaid orders.
+Consider adding an explicit payment_expires_at deadline field if expiration rules become more complex.
+Consider adding a specialized expiration lookup index if polling volume grows.
 Add order event history.
 Add richer shipment integration.
 Add refund flow.
