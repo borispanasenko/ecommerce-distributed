@@ -353,6 +353,9 @@ Shipped orders cannot be cancelled.
 Shipped orders cannot be marked as Paid again.
 Shipped orders cannot be marked as Shipped again.
 Payment Service calls Ordering to mark orders as Paid when a pending payment succeeds.
+Failed payment attempts do not mutate order status.
+Orders remain `PendingPayment` during the payment window so customers can retry payment.
+If no payment succeeds before timeout, the Ordering expiration worker expires the order and releases Inventory reservations.
 Fulfillment Service calls Ordering to mark orders as Shipped when shipments are shipped.
 GET /api/orders returns order summaries.
 GET /api/orders/{id} returns order details.
@@ -394,7 +397,7 @@ Missing order tests
 Future work:
 
 ```text
-Handle payment failure effects on order lifecycle.
+Add provider-reference idempotency for external payment webhooks.
 Consider adding an explicit payment_expires_at deadline field if expiration rules become more complex.
 Consider adding a specialized expiration lookup index if polling volume grows.
 Add order event history.

@@ -145,6 +145,12 @@ Fail Pending payment            -> success
 Fail already Failed             -> failure for now
 ```
 
+A failed payment attempt does not directly mutate the order.
+
+Ordering keeps the order in `PendingPayment` while the payment window is still open, so the customer may retry payment.
+
+If no successful payment happens before the timeout, the Ordering expiration worker changes the order to `Expired` and releases the Inventory reservation.
+
 Future payment provider webhook handling may need idempotency keys or provider reference based idempotency.
 
 ## Fulfillment commands

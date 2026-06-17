@@ -103,7 +103,7 @@ Rules:
 * Only `Pending` payments can be marked as `Succeeded`.
 * Only `Pending` payments can be marked as `Failed`.
 * `Succeeded` and `Failed` payments cannot be changed again.
-* Failed payments do not call Ordering and do not commit Inventory reservations.
+* Failed payments do not call Ordering, do not mutate order status and do not commit Inventory reservations.
 
 ---
 
@@ -194,7 +194,7 @@ When a pending payment succeeds, Payment Service calls Ordering Service to mark 
 Ordering marks the linked order as Paid and keeps Inventory reservation allocated.
 Inventory reservation is committed later when the paid order is marked as Shipped.
 If Ordering mark-paid request fails, payment remains Pending.
-Failed payments do not call Ordering and do not commit Inventory reservations.
+Failed payments do not call Ordering, do not mutate order status and do not commit Inventory reservations.
 Succeeded payments cannot be failed.
 Failed payments cannot be succeeded.
 Payments with empty order_id are rejected.
@@ -222,7 +222,7 @@ Missing payment tests
 Future work:
 
 ```text
-Handle payment failure effects on order lifecycle.
+Add provider-reference idempotency for external payment webhooks.
 Add payment cancellation.
 Add refund flow.
 Add payment webhooks.
