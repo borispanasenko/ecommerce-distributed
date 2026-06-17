@@ -116,6 +116,36 @@ If a service is started with a different local port from `launchSettings.json`, 
 
 ---
 
+## Ordering expiration worker
+
+Ordering API runs a background worker that automatically expires old `PendingPayment` orders.
+
+Default configuration is stored in `services/ordering/Ordering.Api/appsettings.json`:
+
+```text
+OrderExpiration.Enabled
+OrderExpiration.PaymentTimeoutMinutes
+OrderExpiration.ScanIntervalSeconds
+OrderExpiration.BatchSize
+```
+
+For a fast local worker check, temporarily override the settings when starting Ordering API:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development \
+ConnectionStrings__DefaultConnection="Host=localhost;Port=5434;Database=ordering_db;Username=postgres;Password=postgres" \
+CatalogApi__BaseUrl="http://localhost:5001" \
+InventoryApi__BaseUrl="http://localhost:5245" \
+OrderExpiration__PaymentTimeoutMinutes=1 \
+OrderExpiration__ScanIntervalSeconds=5 \
+OrderExpiration__BatchSize=50 \
+dotnet run --project services/ordering/Ordering.Api/Ordering.Api.csproj
+```
+
+For Docker Compose checks, the same values can be temporarily added under `ordering-api.environment`, but they should not be committed as default compose settings.
+
+---
+
 ## Test commands
 
 ```bash

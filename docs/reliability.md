@@ -113,6 +113,25 @@ Mark-shipped Cancelled          -> failure
 
 Expired means the order was not paid in time and its Inventory reservation has been released.
 
+## Automatic order expiration
+
+Ordering API runs a background worker that periodically expires old unpaid orders.
+
+The worker scans PostgreSQL for `PendingPayment` orders older than the configured payment timeout and calls the same retry-safe expiration command used by the manual expire endpoint.
+
+```text
+OrderExpiration.Enabled
+OrderExpiration.PaymentTimeoutMinutes
+OrderExpiration.ScanIntervalSeconds
+OrderExpiration.BatchSize
+```
+
+The worker does not own business state. PostgreSQL remains the source of truth for order status.
+
+If Inventory reservation release fails, the order remains `PendingPayment` and can be retried by a later worker scan.
+
+Redis TTL is not used as the source of truth for order expiration.
+
 ## Payment commands
 
 Payment owns payment state.
