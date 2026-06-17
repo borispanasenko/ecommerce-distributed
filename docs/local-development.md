@@ -170,6 +170,7 @@ Use them after rebuilding services or changing cross-service lifecycle behavior.
 ./scripts/smoke/checkout-payment-fulfillment-smoke.sh
 ./scripts/smoke/inventory-reservation-idempotency-smoke.sh
 ./scripts/smoke/order-expiration-smoke.sh
+./scripts/smoke/payment-failure-lifecycle-smoke.sh
 ```
 
 The scripts support environment variable overrides:
@@ -200,6 +201,11 @@ order-expiration-smoke.sh
   Checks PendingPayment -> Expired.
   Verifies that Inventory reservation is released.
   Verifies that expire retry is success/no-op.
+
+payment-failure-lifecycle-smoke.sh
+  Checks that a failed payment does not mutate order status.
+  Verifies that Inventory reservation remains allocated after payment failure.
+  Verifies that expiration releases the reservation afterwards.
 ```
 
 `.http` files are still useful for manual API exploration.
