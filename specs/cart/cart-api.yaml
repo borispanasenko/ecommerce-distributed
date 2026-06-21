@@ -1,0 +1,301 @@
+openapi: 3.0.3
+info:
+  title: Cart Service API
+  description: API for managing shopping carts and cart items.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5005
+    description: .NET Cart Service Local Server
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - service
+                  - status
+                  - timestamp
+                properties:
+                  service:
+                    type: string
+                    example: Cart
+                  status:
+                    type: string
+                    example: OK
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/carts:
+    post:
+      tags:
+        - Carts
+      summary: Create a new shopping cart
+      operationId: createCart
+      responses:
+        '201':
+          description: Shopping cart created successfully
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the created cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartDto'
+
+  /api/carts/{cartId}:
+    get:
+      tags:
+        - Carts
+      summary: Get shopping cart details by ID
+      operationId: getCartById
+      parameters:
+        - name: cartId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartDto'
+        '404':
+          description: Cart not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/carts/{cartId}/items:
+    post:
+      tags:
+        - Carts
+      summary: Add an item to the shopping cart
+      operationId: addCartItem
+      parameters:
+        - name: cartId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      responses:
+        '200':
+          description: Item added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartDto'
+        '400':
+          description: Invalid input / Variant ID required / Negative quantity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Cart not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/carts/{cartId}/items/{productVariantId}:
+    put:
+      tags:
+        - Carts
+      summary: Update a cart item quantity
+      operationId: updateCartItem
+      parameters:
+        - name: cartId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: productVariantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        '200':
+          description: Cart item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartDto'
+        '400':
+          description: Invalid input / Negative quantity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Cart or item not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Carts
+      summary: Remove an item from the shopping cart
+      operationId: removeCartItem
+      parameters:
+        - name: cartId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: productVariantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Cart item removed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartDto'
+        '404':
+          description: Cart or item not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/carts/{cartId}/clear:
+    post:
+      tags:
+        - Carts
+      summary: Clear all items from the shopping cart
+      operationId: clearCart
+      parameters:
+        - name: cartId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Cart cleared successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartDto'
+        '404':
+          description: Cart not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    AddCartItemRequest:
+      type: object
+      required:
+        - productVariantId
+        - quantity
+      properties:
+        productVariantId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+
+    UpdateCartItemRequest:
+      type: object
+      required:
+        - quantity
+      properties:
+        quantity:
+          type: integer
+
+    CartDto:
+      type: object
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - items
+      properties:
+        id:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemDto'
+
+    CartItemDto:
+      type: object
+      required:
+        - id
+        - productVariantId
+        - quantity
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        productVariantId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string

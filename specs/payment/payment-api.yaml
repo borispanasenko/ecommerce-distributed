@@ -1,0 +1,316 @@
+openapi: 3.0.3
+info:
+  title: Payment Service API
+  description: API for managing payments, simulating payment providers, and tracking transaction statuses.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5004
+    description: .NET Payment Service Local Server
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - service
+                  - status
+                  - timestamp
+                properties:
+                  service:
+                    type: string
+                    example: Payment
+                  status:
+                    type: string
+                    example: OK
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/payments:
+    get:
+      tags:
+        - Payments
+      summary: List all payments
+      operationId: getPayments
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentListItemDto'
+    post:
+      tags:
+        - Payments
+      summary: Create a new payment record (Pending state)
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Payment created successfully
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the created payment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetailsDto'
+        '400':
+          description: Invalid input / Amount invalid / Currency invalid / Order ID required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payments/{paymentId}:
+    get:
+      tags:
+        - Payments
+      summary: Get payment details by ID
+      operationId: getPaymentById
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetailsDto'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payments/{paymentId}/succeed:
+    post:
+      tags:
+        - Payments
+      summary: Mark a pending payment as Succeeded
+      description: Notifies the Ordering service that the payment has succeeded, transitioning the order status to Paid.
+      operationId: succeedPayment
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompletePaymentRequest'
+      responses:
+        '200':
+          description: Payment succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetailsDto'
+        '400':
+          description: Payment not pending / Ordering service notify failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payments/{paymentId}/fail:
+    post:
+      tags:
+        - Payments
+      summary: Mark a pending payment as Failed
+      operationId: failPayment
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FailPaymentRequest'
+      responses:
+        '200':
+          description: Payment marked as failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetailsDto'
+        '400':
+          description: Payment not pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    CreatePaymentRequest:
+      type: object
+      required:
+        - orderId
+        - amountMinor
+        - currency
+        - provider
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        provider:
+          type: string
+
+    CompletePaymentRequest:
+      type: object
+      properties:
+        providerReference:
+          type: string
+          nullable: true
+
+    FailPaymentRequest:
+      type: object
+      properties:
+        failureReason:
+          type: string
+          nullable: true
+
+    PaymentListItemDto:
+      type: object
+      required:
+        - id
+        - orderId
+        - amountMinor
+        - currency
+        - status
+        - provider
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        status:
+          type: string
+        provider:
+          type: string
+        providerReference:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    PaymentDetailsDto:
+      type: object
+      required:
+        - id
+        - orderId
+        - amountMinor
+        - currency
+        - status
+        - provider
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        status:
+          type: string
+        provider:
+          type: string
+        providerReference:
+          type: string
+          nullable: true
+        failureReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        succeededAt:
+          type: string
+          format: date-time
+          nullable: true
+        failedAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string

@@ -1,0 +1,631 @@
+openapi: 3.0.3
+info:
+  title: Inventory Service API
+  description: API for managing warehouses, storage locations, stock levels, movements, and reservations.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5003
+    description: .NET Inventory Service Local Server
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - service
+                  - status
+                  - timestamp
+                properties:
+                  service:
+                    type: string
+                    example: Inventory
+                  status:
+                    type: string
+                    example: OK
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/warehouses:
+    get:
+      tags:
+        - Warehouses
+      summary: List all warehouses
+      operationId: getWarehouses
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WarehouseDto'
+    post:
+      tags:
+        - Warehouses
+      summary: Create a new warehouse
+      operationId: createWarehouse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWarehouseRequest'
+      responses:
+        '201':
+          description: Warehouse created successfully
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the created warehouse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WarehouseDto'
+        '400':
+          description: Invalid input / Duplicate warehouse code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/locations:
+    get:
+      tags:
+        - Locations
+      summary: List storage locations
+      operationId: getLocations
+      parameters:
+        - name: warehouseId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StorageLocationDto'
+    post:
+      tags:
+        - Locations
+      summary: Create a new storage location
+      operationId: createLocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLocationRequest'
+      responses:
+        '201':
+          description: Location created successfully
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the created location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageLocationDto'
+        '400':
+          description: Invalid input / Duplicate location code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/stock/receipts:
+    post:
+      tags:
+        - Stock
+      summary: Receive stock for a SKU
+      operationId: receiveStock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReceiveStockRequest'
+      responses:
+        '200':
+          description: Stock received successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockReceiptDto'
+        '400':
+          description: Invalid input / Warehouse or location not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/stock/movements:
+    get:
+      tags:
+        - Stock
+      summary: List stock movements
+      operationId: getStockMovements
+      parameters:
+        - name: sku
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StockMovementDto'
+
+  /api/stock/reservations:
+    post:
+      tags:
+        - Stock
+      summary: Explicitly reserve stock at a specific warehouse/location
+      operationId: reserveStock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStockReservationRequest'
+      responses:
+        '201':
+          description: Stock reserved successfully
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the created reservation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockReservationDto'
+        '400':
+          description: Insufficient stock / Invalid inputs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/stock/reservations/allocate:
+    post:
+      tags:
+        - Stock
+      summary: Automatically allocate and reserve stock across locations for a SKU
+      operationId: allocateStockReservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AllocateStockReservationRequest'
+      responses:
+        '201':
+          description: Stock allocated and reserved successfully
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the created reservation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockReservationDto'
+        '400':
+          description: Insufficient stock
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/stock/reservations/{reservationId}/release:
+    post:
+      tags:
+        - Stock
+      summary: Release an active stock reservation
+      operationId: releaseStockReservation
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Stock reservation released successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockReservationDto'
+        '400':
+          description: Reservation not found or invalid state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/stock/reservations/{reservationId}/commit:
+    post:
+      tags:
+        - Stock
+      summary: Commit a stock reservation (reducing on-hand stock)
+      operationId: commitStockReservation
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Stock reservation committed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockReservationDto'
+        '400':
+          description: Reservation not found or invalid state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/stock/{sku}:
+    get:
+      tags:
+        - Stock
+      summary: Get stock balance details by SKU
+      operationId: getStockBySku
+      parameters:
+        - name: sku
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockSummaryDto'
+        '404':
+          description: Stock not found for the SKU
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    WarehouseDto:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - isActive
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        isActive:
+          type: boolean
+
+    CreateWarehouseRequest:
+      type: object
+      required:
+        - code
+        - name
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+
+    StorageLocationDto:
+      type: object
+      required:
+        - id
+        - warehouseId
+        - code
+        - isActive
+      properties:
+        id:
+          type: string
+          format: uuid
+        warehouseId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        isActive:
+          type: boolean
+
+    CreateLocationRequest:
+      type: object
+      required:
+        - warehouseId
+        - code
+      properties:
+        warehouseId:
+          type: string
+          format: uuid
+        code:
+          type: string
+
+    ReceiveStockRequest:
+      type: object
+      required:
+        - sku
+        - warehouseId
+        - locationId
+        - quantity
+      properties:
+        sku:
+          type: string
+        warehouseId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          format: int64
+        reason:
+          type: string
+          nullable: true
+
+    StockReceiptDto:
+      type: object
+      required:
+        - sku
+        - warehouseId
+        - locationId
+        - receivedQuantity
+        - onHandQuantity
+        - reservedQuantity
+        - availableQuantity
+      properties:
+        sku:
+          type: string
+        warehouseId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        receivedQuantity:
+          type: integer
+          format: int64
+        onHandQuantity:
+          type: integer
+          format: int64
+        reservedQuantity:
+          type: integer
+          format: int64
+        availableQuantity:
+          type: integer
+          format: int64
+
+    StockSummaryDto:
+      type: object
+      required:
+        - sku
+        - totalOnHandQuantity
+        - totalReservedQuantity
+        - totalAvailableQuantity
+        - locations
+      properties:
+        sku:
+          type: string
+        totalOnHandQuantity:
+          type: integer
+          format: int64
+        totalReservedQuantity:
+          type: integer
+          format: int64
+        totalAvailableQuantity:
+          type: integer
+          format: int64
+        locations:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockLocationBalanceDto'
+
+    StockLocationBalanceDto:
+      type: object
+      required:
+        - warehouseId
+        - warehouseCode
+        - locationId
+        - locationCode
+        - onHandQuantity
+        - reservedQuantity
+        - availableQuantity
+      properties:
+        warehouseId:
+          type: string
+          format: uuid
+        warehouseCode:
+          type: string
+        locationId:
+          type: string
+          format: uuid
+        locationCode:
+          type: string
+        onHandQuantity:
+          type: integer
+          format: int64
+        reservedQuantity:
+          type: integer
+          format: int64
+        availableQuantity:
+          type: integer
+          format: int64
+
+    StockMovementDto:
+      type: object
+      required:
+        - id
+        - sku
+        - warehouseId
+        - warehouseCode
+        - locationId
+        - locationCode
+        - type
+        - quantity
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        warehouseId:
+          type: string
+          format: uuid
+        warehouseCode:
+          type: string
+        locationId:
+          type: string
+          format: uuid
+        locationCode:
+          type: string
+        type:
+          type: string
+        quantity:
+          type: integer
+          format: int64
+        reason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateStockReservationRequest:
+      type: object
+      required:
+        - sku
+        - warehouseId
+        - locationId
+        - quantity
+      properties:
+        sku:
+          type: string
+        warehouseId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          format: int64
+        reference:
+          type: string
+          nullable: true
+
+    AllocateStockReservationRequest:
+      type: object
+      required:
+        - sku
+        - quantity
+      properties:
+        sku:
+          type: string
+        quantity:
+          type: integer
+          format: int64
+        reference:
+          type: string
+          nullable: true
+
+    StockReservationDto:
+      type: object
+      required:
+        - id
+        - sku
+        - warehouseId
+        - locationId
+        - quantity
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        warehouseId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          format: int64
+        status:
+          type: string
+        reference:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        releasedAt:
+          type: string
+          format: date-time
+          nullable: true
+        committedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string

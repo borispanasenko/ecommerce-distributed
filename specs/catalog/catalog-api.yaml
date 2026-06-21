@@ -1,0 +1,651 @@
+openapi: 3.0.3
+info:
+  title: Catalog Service API
+  description: API for managing products, variants, brands, and categories in the Catalog microservice.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5001
+    description: .NET Catalog Service Local Server
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Healthy
+
+  /api/brands:
+    get:
+      tags:
+        - Brands
+      summary: List all brands
+      operationId: getBrands
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BrandDto'
+    post:
+      tags:
+        - Brands
+      summary: Create a new brand
+      operationId: createBrand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBrandRequest'
+      responses:
+        '201':
+          description: Brand created successfully
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the created brand
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandDto'
+        '400':
+          description: Invalid input / Duplicate brand slug
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/categories:
+    get:
+      tags:
+        - Categories
+      summary: List all categories
+      operationId: getCategories
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryDto'
+    post:
+      tags:
+        - Categories
+      summary: Create a new category
+      operationId: createCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryRequest'
+      responses:
+        '201':
+          description: Category created successfully
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the created category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryDto'
+        '400':
+          description: Invalid input / Duplicate category slug
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/products:
+    get:
+      tags:
+        - Products
+      summary: List all active products
+      operationId: getProducts
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductListItemDto'
+    post:
+      tags:
+        - Products
+      summary: Create a new product as Draft
+      operationId: createProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+      responses:
+        '201':
+          description: Product created successfully as Draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCommandResponse'
+        '400':
+          description: Invalid input / Brand not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/products/{productId}:
+    get:
+      tags:
+        - Products
+      summary: Get product details by ID
+      operationId: getProductById
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetailsDto'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/products/{productId}/variants:
+    post:
+      tags:
+        - Products
+      summary: Add a new variant to a product
+      operationId: addVariant
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddProductVariantRequest'
+      responses:
+        '201':
+          description: Product variant added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductVariantCommandResponse'
+        '400':
+          description: Invalid input / Duplicate SKU
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/products/{productId}/publish:
+    post:
+      tags:
+        - Products
+      summary: Publish a draft product
+      operationId: publishProduct
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product published successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCommandResponse'
+        '400':
+          description: Invalid state transition / Validations failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/products/{productId}/archive:
+    post:
+      tags:
+        - Products
+      summary: Archive a product
+      operationId: archiveProduct
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product archived successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCommandResponse'
+        '400':
+          description: Invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/products/variants/{productVariantId}/snapshot:
+    get:
+      tags:
+        - Products
+      summary: Get active product variant snapshot
+      description: Used by other services (like Ordering) to fetch a read-only snapshot of a product variant for price calculations and order line snapshots.
+      operationId: getProductVariantSnapshot
+      parameters:
+        - name: productVariantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductVariantSnapshotDto'
+        '404':
+          description: Active product variant snapshot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    BrandDto:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+
+    CreateBrandRequest:
+      type: object
+      required:
+        - name
+        - slug
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+
+    CategoryDto:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - isActive
+        - sortOrder
+      properties:
+        id:
+          type: string
+          format: uuid
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    CreateCategoryRequest:
+      type: object
+      required:
+        - name
+        - slug
+        - sortOrder
+      properties:
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        sortOrder:
+          type: integer
+
+    ProductListItemDto:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - status
+        - categories
+        - variants
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        brandName:
+          type: string
+          nullable: true
+        status:
+          type: string
+        primaryImageUrl:
+          type: string
+          nullable: true
+        categories:
+          type: array
+          items:
+            type: string
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductVariantListItemDto'
+
+    CreateProductRequest:
+      type: object
+      required:
+        - name
+        - slug
+        - categoryIds
+      properties:
+        brandId:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        categoryIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    AddProductVariantRequest:
+      type: object
+      required:
+        - sku
+        - name
+        - priceAmountMinor
+        - currency
+      properties:
+        sku:
+          type: string
+        name:
+          type: string
+        priceAmountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+
+    ProductCommandResponse:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+
+    ProductVariantCommandResponse:
+      type: object
+      required:
+        - id
+        - productId
+        - sku
+        - name
+        - priceAmountMinor
+        - currency
+        - isActive
+      properties:
+        id:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        name:
+          type: string
+        priceAmountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        isActive:
+          type: boolean
+
+    ProductVariantListItemDto:
+      type: object
+      required:
+        - id
+        - sku
+        - name
+        - priceAmountMinor
+        - currency
+        - isActive
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        name:
+          type: string
+        priceAmountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        isActive:
+          type: boolean
+
+    ProductDetailsDto:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - status
+        - categories
+        - variants
+        - images
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        brand:
+          $ref: '#/components/schemas/ProductBrandDto'
+        status:
+          type: string
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductCategoryDto'
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductVariantListItemDto'
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductImageDto'
+
+    ProductBrandDto:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+
+    ProductCategoryDto:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+
+    ProductImageDto:
+      type: object
+      required:
+        - id
+        - url
+        - sortOrder
+        - isPrimary
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+        altText:
+          type: string
+          nullable: true
+        sortOrder:
+          type: integer
+        isPrimary:
+          type: boolean
+        variantId:
+          type: string
+          format: uuid
+          nullable: true
+
+    ProductVariantSnapshotDto:
+      type: object
+      required:
+        - productId
+        - productVariantId
+        - sku
+        - productName
+        - variantName
+        - priceAmountMinor
+        - currency
+      properties:
+        productId:
+          type: string
+          format: uuid
+        productVariantId:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        productName:
+          type: string
+        variantName:
+          type: string
+        priceAmountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
