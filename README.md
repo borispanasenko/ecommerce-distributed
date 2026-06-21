@@ -534,16 +534,28 @@ Write `.http` files may change local development data, but flows are designed to
 
 ## Documentation
 
-- Architecture and service boundaries: [docs/architecture.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/architecture.md)
+- Architecture overview & index: [docs/architecture/index.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/architecture/index.md)
+  - [System Overview](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/architecture/system-overview.md)
+  - [Main Flows](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/architecture/main-flows.md)
+  - [Inventory Commit Boundary](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/architecture/inventory-commit-boundary.md)
+  - [Service Authority Matrix](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/architecture/service-authority-matrix.md)
+  - [Domain Invariants](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/architecture/domain-invariants.md)
+- Security documentation:
+  - [Data Trust Model](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/security/data-trust-model.md)
+  - [API Trust Boundaries](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/security/api-trust-boundaries.md)
+  - [Authorization Model](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/security/authorization-model.md)
+  - [Security-Critical Data Registry](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/security/security-critical-data-registry.md)
+  - [Logging and Observability Policy](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/security/logging-observability-policy.md)
+  - [Data Classification Model](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/security/data-classification.md)
 - Local development and environment notes: [docs/local-development.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/local-development.md)
 - Reliability and idempotency rules: [docs/reliability.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/reliability.md)
 - Service-owned data model docs:
-  - [docs/catalog-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/catalog-db.md)
-  - [docs/inventory-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/inventory-db.md)
-  - [docs/cart-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/cart-db.md)
-  - [docs/ordering-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/ordering-db.md)
-  - [docs/payment-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/payment-db.md)
-  - [docs/fulfillment-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/fulfillment-db.md)
+  - [docs/services/catalog-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/services/catalog-db.md)
+  - [docs/services/inventory-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/services/inventory-db.md)
+  - [docs/services/cart-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/services/cart-db.md)
+  - [docs/services/ordering-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/services/ordering-db.md)
+  - [docs/services/payment-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/services/payment-db.md)
+  - [docs/services/fulfillment-db.md](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/docs/services/fulfillment-db.md)
 - API Specs & BDD Specifications:
   - **Catalog**: [Contract](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/specs/catalog/catalog-api.yaml) | [BDD Spec](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/specs/catalog/catalog-spec.md)
   - **Inventory**: [Contract](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/specs/inventory/inventory-api.yaml) | [BDD Spec](/run/media/borispanasenko/T7_Shield/ecommerce-distributed/specs/inventory/inventory-spec.md)
