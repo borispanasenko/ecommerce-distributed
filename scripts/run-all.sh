@@ -25,7 +25,7 @@ wait_for_health() {
 }
 
 echo "== Up =="
-"$ROOT_DIR/scripts/docker-up-build.sh"
+(cd "$ROOT_DIR" && docker compose up -d --build)
 
 echo "== Wait for services =="
 wait_for_health "$CATALOG/health" "Catalog"

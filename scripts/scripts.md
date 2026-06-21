@@ -17,5 +17,5 @@ Builds all services locally on your machine using dotnet:
 ### 3. Start Docker Compose Stack (forces rebuilding containers)
 Spins up the Docker Compose environment and forces rebuilding of updated service images:
 ```bash
-./scripts/docker-up-build.sh
+docker compose up -d --build
 ```
