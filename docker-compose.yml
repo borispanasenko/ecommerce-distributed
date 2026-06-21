@@ -7,9 +7,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: Host=catalog-db;Port=5432;Database=catalog_db;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=catalog-db;Port=5432;Database=catalog_db;Username=${DB_USER:-postgres};Password=${DB_PASSWORD:-postgres}
     ports:
-      - "5001:8080"
+      - "${CATALOG_PORT:-5001}:8080"
     depends_on:
       catalog-db:
         condition: service_healthy
@@ -22,11 +22,11 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: Host=ordering-db;Port=5432;Database=ordering_db;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=ordering-db;Port=5432;Database=ordering_db;Username=${DB_USER:-postgres};Password=${DB_PASSWORD:-postgres}
       CatalogApi__BaseUrl: http://catalog-api:8080
       InventoryApi__BaseUrl: http://inventory-api:8080
     ports:
-      - "5002:8080"
+      - "${ORDERING_PORT:-5002}:8080"
     depends_on:
       ordering-db:
         condition: service_healthy
@@ -43,9 +43,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: Host=inventory-db;Port=5432;Database=inventory_db;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=inventory-db;Port=5432;Database=inventory_db;Username=${DB_USER:-postgres};Password=${DB_PASSWORD:-postgres}
     ports:
-      - "5003:8080"
+      - "${INVENTORY_PORT:-5003}:8080"
     depends_on:
       inventory-db:
         condition: service_healthy
@@ -58,10 +58,10 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: Host=payment-db;Port=5432;Database=payment_db;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=payment-db;Port=5432;Database=payment_db;Username=${DB_USER:-postgres};Password=${DB_PASSWORD:-postgres}
       OrderingApi__BaseUrl: http://ordering-api:8080
     ports:
-      - "5004:8080"
+      - "${PAYMENT_PORT:-5004}:8080"
     depends_on:
       payment-db:
         condition: service_healthy
@@ -75,9 +75,9 @@ services:
     container_name: cart-api
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: Host=cart-db;Port=5432;Database=cart_db;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=cart-db;Port=5432;Database=cart_db;Username=${DB_USER:-postgres};Password=${DB_PASSWORD:-postgres}
     ports:
-      - "5005:8080"
+      - "${CART_PORT:-5005}:8080"
     depends_on:
       cart-db:
         condition: service_healthy
@@ -89,10 +89,10 @@ services:
     container_name: fulfillment-api
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: Host=fulfillment-db;Port=5432;Database=fulfillment_db;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=fulfillment-db;Port=5432;Database=fulfillment_db;Username=${DB_USER:-postgres};Password=${DB_PASSWORD:-postgres}
       OrderingApi__BaseUrl: http://ordering-api:8080
     ports:
-      - "5006:8080"
+      - "${FULFILLMENT_PORT:-5006}:8080"
     depends_on:
       fulfillment-db:
         condition: service_healthy
@@ -104,14 +104,14 @@ services:
     container_name: catalog-db
     environment:
       POSTGRES_DB: catalog_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "5433:5432"
+      - "${CATALOG_DB_PORT:-5433}:5432"
     volumes:
       - catalog-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d catalog_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER:-postgres} -d catalog_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -121,14 +121,14 @@ services:
     container_name: ordering-db
     environment:
       POSTGRES_DB: ordering_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "5434:5432"
+      - "${ORDERING_DB_PORT:-5434}:5432"
     volumes:
       - ordering-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ordering_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER:-postgres} -d ordering_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -138,14 +138,14 @@ services:
     container_name: inventory-db
     environment:
       POSTGRES_DB: inventory_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "5435:5432"
+      - "${INVENTORY_DB_PORT:-5435}:5432"
     volumes:
       - inventory-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d inventory_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER:-postgres} -d inventory_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -155,14 +155,14 @@ services:
     container_name: payment-db
     environment:
       POSTGRES_DB: payment_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "5436:5432"
+      - "${PAYMENT_DB_PORT:-5436}:5432"
     volumes:
       - payment-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d payment_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER:-postgres} -d payment_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -172,14 +172,14 @@ services:
     container_name: cart-db
     environment:
       POSTGRES_DB: cart_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "5437:5432"
+      - "${CART_DB_PORT:-5437}:5432"
     volumes:
       - cart-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d cart_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER:-postgres} -d cart_db"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -189,14 +189,14 @@ services:
     container_name: fulfillment-db
     environment:
       POSTGRES_DB: fulfillment_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "5438:5432"
+      - "${FULFILLMENT_DB_PORT:-5438}:5432"
     volumes:
       - fulfillment-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d fulfillment_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER:-postgres} -d fulfillment_db"]
       interval: 5s
       timeout: 5s
       retries: 10
