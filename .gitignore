@@ -101,6 +101,7 @@ pnpm-debug.log*
 # -------------------------
 # Docker / local data
 # -------------------------
+docker-compose.override.yml
 docker-data/
 data/
 volumes/
