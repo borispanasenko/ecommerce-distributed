@@ -31,7 +31,20 @@ Developing a distributed system on synchronous HTTP commands means accepting tha
 
 ---
 
-## 3. Configuration & Ports Matrix
+## 3. Trust Boundaries & Catalog Snapshots (Zero-Trust Frontend)
+
+### The Challenge
+How do we ensure that a malicious user or corrupted client-side state cannot manipulate product prices or names during checkout?
+
+* **The Problem:** The frontend and Cart service store the product details (ID, quantity) for presentation. If the frontend sent the price to `Ordering` during checkout, it would be extremely easy to exploit (e.g., changing a $1000 item to $1).
+* **The Solution (Server-to-Server Verification):**
+  * The checkout request contains **only** `product_variant_id` and `quantity`.
+  * `Ordering` calls `Catalog` service directly via server-to-server HTTP to retrieve the current *trusted price* and product details.
+  * It then takes a **permanent snapshot** of this metadata inside the `Ordering` database. This ensures historical orders remain unaffected even if the catalog price or description changes in the future.
+
+---
+
+## 4. Configuration & Ports Matrix
 
 Managing 6 distinct microservices, their corresponding PostgreSQL databases, and a frontend application requires a strict configuration discipline.
 
@@ -40,7 +53,7 @@ Managing 6 distinct microservices, their corresponding PostgreSQL databases, and
 
 ---
 
-## 4. BDD & Smoke Testing as the Ultimate Safeguard
+## 5. BDD & Smoke Testing as the Ultimate Safeguard
 
 When behavior spans multiple microservices (`Cart` -> `Ordering` -> `Payment` -> `Fulfillment` -> `Inventory`), unit tests are not enough.
 
