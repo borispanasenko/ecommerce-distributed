@@ -411,7 +411,7 @@ Then run Ordering API:
 ```bash
 ASPNETCORE_ENVIRONMENT=Development \
 ConnectionStrings__DefaultConnection="Host=localhost;Port=5434;Database=ordering_db;Username=postgres;Password=postgres" \
-CatalogApi__BaseUrl="http://localhost:5001" \
+CatalogApi__BaseUrl="http://localhost:5072" \
 InventoryApi__BaseUrl="http://localhost:5245" \
 dotnet run --project services/ordering/Ordering.Api/Ordering.Api.csproj
 ```
